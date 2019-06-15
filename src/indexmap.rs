@@ -1,19 +1,18 @@
 use core::{
     borrow::Borrow,
     fmt,
-    iter::FromIterator,
-    mem::{self, MaybeUninit},
+    /*iter::FromIterator,*/
+    mem::{self/*, MaybeUninit*/},
     num::NonZeroU32,
     ops, slice,
 };
 
-use generic_array::{typenum::PowerOfTwo, ArrayLength, GenericArray};
 use hash32::{BuildHasher, BuildHasherDefault, FnvHasher, Hash, Hasher};
 
 use crate::Vec;
 
 /// An `IndexMap` using the default FNV hasher
-pub type FnvIndexMap<K, V, N> = IndexMap<K, V, N, BuildHasherDefault<FnvHasher>>;
+pub type FnvIndexMap<K, V, const N: usize> = IndexMap<K, V, BuildHasherDefault<FnvHasher>, {N}>;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 struct HashValue(u16);
@@ -85,42 +84,40 @@ macro_rules! probe_loop {
     }
 }
 
-struct CoreMap<K, V, N>
+struct CoreMap<K, V, const N: usize>
 where
     K: Eq + Hash,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
-    entries: Vec<Bucket<K, V>, N>,
-    indices: GenericArray<Option<Pos>, N>,
+    entries: Vec<Bucket<K, V>, {N}>,
+    indices: [Option<Pos>; {N}],
 }
 
-impl<K, V, N> CoreMap<K, V, N>
+impl<K, V, const N: usize> CoreMap<K, V, {N}>
 where
     K: Eq + Hash,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
-    // TODO turn into a `const fn`; needs `mem::zeroed` to be a `const fn`
+/*    // TODO turn into a `const fn`; needs `mem::zeroed` to be a `const fn`
     fn new() -> Self {
         CoreMap {
             entries: Vec::new(),
             indices: unsafe { MaybeUninit::zeroed().assume_init() },
         }
     }
-
-    fn capacity() -> usize {
-        N::to_usize()
+*/
+/*    fn capacity() -> usize {
+        N
     }
 
     fn mask() -> usize {
-        Self::capacity() - 1
+        N - 1
     }
-
+*/
     fn find<Q>(&self, hash: HashValue, query: &Q) -> Option<(usize, usize)>
     where
         K: Borrow<Q>,
         Q: ?Sized + Eq,
     {
-        let mut probe = hash.desired_pos(Self::mask());
+        let mut probe = hash.desired_pos(N-1); // Self::mask()
         let mut dist = 0;
 
         probe_loop!(probe < self.indices.len(), {
@@ -130,7 +127,7 @@ where
                 let i = pos.index();
                 debug_assert!(i < self.entries.len());
 
-                if dist > entry_hash.probe_distance(Self::mask(), probe) {
+                if dist > entry_hash.probe_distance(N-1, probe) {//Self::mask()
                     // give up when probe distance is too long
                     return None;
                 } else if entry_hash == hash
@@ -146,13 +143,14 @@ where
         });
     }
 
+
     // First phase: Look for the preferred location for key.
     //
     // We will know if `key` is already in the map, before we need to insert it.
     // When we insert they key, it might be that we need to continue displacing
     // entries (robin hood hashing), in which case Inserted::RobinHood is returned
     fn insert_phase_1(&mut self, hash: HashValue, key: K, value: V) -> Inserted<V> {
-        let mut probe = hash.desired_pos(Self::mask());
+        let mut probe = hash.desired_pos(N-1); //Self::mask()
         let mut dist = 0;
 
         let inserted;
@@ -165,7 +163,7 @@ where
                 let i = pos.index();
                 debug_assert!(i < self.entries.len());
 
-                let their_dist = entry_hash.probe_distance(Self::mask(), probe);
+                let their_dist = entry_hash.probe_distance(N-1, probe); //Self::mask()
 
                 if their_dist < dist {
                     // robin hood: steal the spot if it's better for us
@@ -228,7 +226,7 @@ where
         if let Some(entry) = self.entries.get(found) {
             // was not last element
             // examine new element in `found` and find it in indices
-            let mut probe = entry.hash.desired_pos(Self::mask());
+            let mut probe = entry.hash.desired_pos(N-1); //Self::mask()
 
             probe_loop!(probe < self.indices.len(), {
                 if let Some(pos) = self.indices[probe] {
@@ -256,7 +254,7 @@ where
             if let Some(pos) = self.indices[probe] {
                 let entry_hash = pos.hash();
 
-                if entry_hash.probe_distance(Self::mask(), probe) > 0 {
+                if entry_hash.probe_distance(N-1, probe) > 0 {//Self::mask()
                     unsafe { *self.indices.get_unchecked_mut(last_probe) = self.indices[probe] }
                     self.indices[probe] = None;
                 } else {
@@ -269,12 +267,11 @@ where
         });
     }
 }
-
-impl<K, V, N> Clone for CoreMap<K, V, N>
+/*
+impl<K, V, const N: usize> Clone for CoreMap<K, V, {N}>
 where
     K: Eq + Hash + Clone,
     V: Clone,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -282,7 +279,7 @@ where
             indices: self.indices.clone(),
         }
     }
-}
+}*/
 
 /// Fixed capacity [`IndexMap`](https://docs.rs/indexmap/1/indexmap/map/struct.IndexMap.html)
 ///
@@ -292,10 +289,9 @@ where
 ///
 /// ```
 /// use heapless::FnvIndexMap;
-/// use heapless::consts::*;
 ///
 /// // A hash map with a capacity of 16 key-value pairs allocated on the stack
-/// let mut book_reviews = FnvIndexMap::<_, _, U16>::new();
+/// let mut book_reviews = FnvIndexMap::<_, _, 16>::new();
 ///
 /// // review some books.
 /// book_reviews.insert("Adventures of Huckleberry Finn",    "My favorite book.").unwrap();
@@ -326,20 +322,19 @@ where
 ///     println!("{}: \"{}\"", book, review);
 /// }
 /// ```
-pub struct IndexMap<K, V, N, S>
+pub struct IndexMap<K, V, S, const N: usize>
 where
     K: Eq + Hash,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
-    core: CoreMap<K, V, N>,
+    core: CoreMap<K, V, {N}>,
     build_hasher: S,
 }
-
-impl<K, V, N, S> IndexMap<K, V, N, BuildHasherDefault<S>>
+/*
+impl<K, V, S, const N: usize> IndexMap<K, V, BuildHasherDefault<S>, {N}>
 where
     K: Eq + Hash,
     S: Default + Hasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>> + PowerOfTwo,
+//    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>> + PowerOfTwo,
 {
     // TODO turn into a `const fn`; needs `mem::zeroed` to be a `const fn`
     /// Creates an empty `IndexMap`.
@@ -351,27 +346,25 @@ where
             core: CoreMap::new(),
         }
     }
-}
+}*/
 
-impl<K, V, N, S> IndexMap<K, V, N, S>
+impl<K, V, S, const N: usize> IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     /* Public API */
     /// Returns the number of elements the map can hold
     pub fn capacity(&self) -> usize {
-        N::to_usize()
+        N
     }
 
     /// Return an iterator over the keys of the map, in their order
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U16>::new();
+    /// let mut map = FnvIndexMap::<_, _, 16>::new();
     /// map.insert("a", 1).unwrap();
     /// map.insert("b", 2).unwrap();
     /// map.insert("c", 3).unwrap();
@@ -388,9 +381,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U16>::new();
+    /// let mut map = FnvIndexMap::<_, _, 16>::new();
     /// map.insert("a", 1).unwrap();
     /// map.insert("b", 2).unwrap();
     /// map.insert("c", 3).unwrap();
@@ -407,9 +399,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U16>::new();
+    /// let mut map = FnvIndexMap::<_, _, 16>::new();
     /// map.insert("a", 1).unwrap();
     /// map.insert("b", 2).unwrap();
     /// map.insert("c", 3).unwrap();
@@ -430,9 +421,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U16>::new();
+    /// let mut map = FnvIndexMap::<_, _, 16>::new();
     /// map.insert("a", 1).unwrap();
     /// map.insert("b", 2).unwrap();
     /// map.insert("c", 3).unwrap();
@@ -451,9 +441,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U16>::new();
+    /// let mut map = FnvIndexMap::<_, _, 16>::new();
     /// map.insert("a", 1).unwrap();
     /// map.insert("b", 2).unwrap();
     /// map.insert("c", 3).unwrap();
@@ -481,9 +470,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut a = FnvIndexMap::<_, _, U16>::new();
+    /// let mut a = FnvIndexMap::<_, _, 16>::new();
     /// assert_eq!(a.len(), 0);
     /// a.insert(1, "a").unwrap();
     /// assert_eq!(a.len(), 1);
@@ -498,9 +486,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut a = FnvIndexMap::<_, _, U16>::new();
+    /// let mut a = FnvIndexMap::<_, _, 16>::new();
     /// assert!(a.is_empty());
     /// a.insert(1, "a");
     /// assert!(!a.is_empty());
@@ -515,9 +502,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut a = FnvIndexMap::<_, _, U16>::new();
+    /// let mut a = FnvIndexMap::<_, _, 16>::new();
     /// a.insert(1, "a");
     /// a.clear();
     /// assert!(a.is_empty());
@@ -538,9 +524,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U16>::new();
+    /// let mut map = FnvIndexMap::<_, _, 16>::new();
     /// map.insert(1, "a").unwrap();
     /// assert_eq!(map.get(&1), Some(&"a"));
     /// assert_eq!(map.get(&2), None);
@@ -565,9 +550,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U8>::new();
+    /// let mut map = FnvIndexMap::<_, _, 8>::new();
     /// map.insert(1, "a").unwrap();
     /// assert_eq!(map.contains_key(&1), true);
     /// assert_eq!(map.contains_key(&2), false);
@@ -591,9 +575,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U8>::new();
+    /// let mut map = FnvIndexMap::<_, _, 8>::new();
     /// map.insert(1, "a").unwrap();
     /// if let Some(x) = map.get_mut(&1) {
     ///     *x = "b";
@@ -630,9 +613,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U8>::new();
+    /// let mut map = FnvIndexMap::<_, _, 8>::new();
     /// assert_eq!(map.insert(37, "a"), Ok(None));
     /// assert_eq!(map.is_empty(), false);
     ///
@@ -663,9 +645,8 @@ where
     ///
     /// ```
     /// use heapless::FnvIndexMap;
-    /// use heapless::consts::*;
     ///
-    /// let mut map = FnvIndexMap::<_, _, U8>::new();
+    /// let mut map = FnvIndexMap::<_, _, 8>::new();
     /// map.insert(1, "a").unwrap();
     /// assert_eq!(map.remove(&1), Some("a"));
     /// assert_eq!(map.remove(&1), None);
@@ -715,12 +696,11 @@ where
     }
 }
 
-impl<'a, K, Q, V, N, S> ops::Index<&'a Q> for IndexMap<K, V, N, S>
+impl<'a, K, Q, V, S, const N: usize> ops::Index<&'a Q> for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash + Borrow<Q>,
     Q: ?Sized + Eq + Hash,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     type Output = V;
 
@@ -729,24 +709,22 @@ where
     }
 }
 
-impl<'a, K, Q, V, N, S> ops::IndexMut<&'a Q> for IndexMap<K, V, N, S>
+impl<'a, K, Q, V, S, const N: usize> ops::IndexMut<&'a Q> for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash + Borrow<Q>,
     Q: ?Sized + Eq + Hash,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn index_mut(&mut self, key: &Q) -> &mut V {
         self.get_mut(key).expect("key not found")
     }
 }
-
-impl<K, V, N, S> Clone for IndexMap<K, V, N, S>
+/*
+impl<K, V, S, const N: usize> Clone for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash + Clone,
     V: Clone,
     S: Clone,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -754,25 +732,23 @@ where
             build_hasher: self.build_hasher.clone(),
         }
     }
-}
+}*/
 
-impl<K, V, N, S> fmt::Debug for IndexMap<K, V, N, S>
+impl<K, V, S, const N: usize> fmt::Debug for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash + fmt::Debug,
     V: fmt::Debug,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map().entries(self.iter()).finish()
     }
 }
-
-impl<K, V, N, S> Default for IndexMap<K, V, N, S>
+/*
+impl<K, V, S, const N: usize> Default for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     S: BuildHasher + Default,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn default() -> Self {
         IndexMap {
@@ -780,18 +756,16 @@ where
             core: CoreMap::new(),
         }
     }
-}
+}*/
 
-impl<K, V, N, S, N2, S2> PartialEq<IndexMap<K, V, N2, S2>> for IndexMap<K, V, N, S>
+impl<K, V, S, S2, const N: usize, const N2: usize> PartialEq<IndexMap<K, V, S2, {N2}>> for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     V: Eq,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
     S2: BuildHasher,
-    N2: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
-    fn eq(&self, other: &IndexMap<K, V, N2, S2>) -> bool {
+    fn eq(&self, other: &IndexMap<K, V, S2, {N2}>) -> bool {
         self.len() == other.len()
             && self
                 .iter()
@@ -799,20 +773,18 @@ where
     }
 }
 
-impl<K, V, N, S> Eq for IndexMap<K, V, N, S>
+impl<K, V, S, const N: usize> Eq for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     V: Eq,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
 }
 
-impl<K, V, N, S> Extend<(K, V)> for IndexMap<K, V, N, S>
+impl<K, V, S, const N: usize> Extend<(K, V)> for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn extend<I>(&mut self, iterable: I)
     where
@@ -824,12 +796,11 @@ where
     }
 }
 
-impl<'a, K, V, N, S> Extend<(&'a K, &'a V)> for IndexMap<K, V, N, S>
+impl<'a, K, V, S, const N: usize> Extend<(&'a K, &'a V)> for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash + Copy,
     V: Copy,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn extend<I>(&mut self, iterable: I)
     where
@@ -838,12 +809,11 @@ where
         self.extend(iterable.into_iter().map(|(&key, &value)| (key, value)))
     }
 }
-
-impl<K, V, N, S> FromIterator<(K, V)> for IndexMap<K, V, N, S>
+/*
+impl<K, V, S, const N: usize> FromIterator<(K, V)> for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     S: BuildHasher + Default,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     fn from_iter<I>(iterable: I) -> Self
     where
@@ -853,13 +823,12 @@ where
         map.extend(iterable);
         map
     }
-}
+}*/
 
-impl<'a, K, V, N, S> IntoIterator for &'a IndexMap<K, V, N, S>
+impl<'a, K, V, S, const N: usize> IntoIterator for &'a IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     type Item = (&'a K, &'a V);
     type IntoIter = Iter<'a, K, V>;
@@ -869,11 +838,10 @@ where
     }
 }
 
-impl<'a, K, V, N, S> IntoIterator for &'a mut IndexMap<K, V, N, S>
+impl<'a, K, V, S, const N: usize> IntoIterator for &'a mut IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
     S: BuildHasher,
-    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>>,
 {
     type Item = (&'a K, &'a mut V);
     type IntoIter = IterMut<'a, K, V>;
@@ -937,11 +905,10 @@ mod tests {
 
     #[test]
     fn size() {
-        type Cap = U4;
+        const CAP: usize = 4;
 
-        let cap = Cap::to_usize();
         assert_eq!(
-            mem::size_of::<FnvIndexMap<i16, u16, Cap>>(),
+            mem::size_of::<FnvIndexMap<i16, u16, CAP>>(),
             cap * mem::size_of::<u32>() + // indices
                 cap * (mem::size_of::<i16>() + // key
                      mem::size_of::<u16>() + // value
@@ -954,10 +921,10 @@ mod tests {
     #[test]
     fn partial_eq() {
         {
-            let mut a: FnvIndexMap<_, _, U4> = FnvIndexMap::new();
+            let mut a: FnvIndexMap<_, _, 4> = FnvIndexMap::new();
             a.insert("k1", "v1").unwrap();
 
-            let mut b: FnvIndexMap<_, _, U4> = FnvIndexMap::new();
+            let mut b: FnvIndexMap<_, _, 4> = FnvIndexMap::new();
             b.insert("k1", "v1").unwrap();
 
             assert!(a == b);
@@ -968,11 +935,11 @@ mod tests {
         }
 
         {
-            let mut a: FnvIndexMap<_, _, U4> = FnvIndexMap::new();
+            let mut a: FnvIndexMap<_, _, 4> = FnvIndexMap::new();
             a.insert("k1", "v1").unwrap();
             a.insert("k2", "v2").unwrap();
 
-            let mut b: FnvIndexMap<_, _, U4> = FnvIndexMap::new();
+            let mut b: FnvIndexMap<_, _, 4> = FnvIndexMap::new();
             b.insert("k2", "v2").unwrap();
             b.insert("k1", "v1").unwrap();
 

@@ -1,20 +1,17 @@
 use core::{marker::PhantomData, ptr::NonNull};
 
-use generic_array::ArrayLength;
-
 use crate::{
     sealed::spsc as sealed,
     spsc::{MultiCore, Queue},
 };
 
-impl<T, N, U, C> Queue<T, N, U, C>
+impl<T, U, C, const N: usize> Queue<T, U, C, {N}>
 where
-    N: ArrayLength<T>,
     U: sealed::Uxx,
     C: sealed::XCore,
 {
     /// Splits a statically allocated queue into producer and consumer end points
-    pub fn split<'rb>(&'rb mut self) -> (Producer<'rb, T, N, U, C>, Consumer<'rb, T, N, U, C>) {
+    pub fn split<'rb>(&'rb mut self) -> (Producer<'rb, T, U, C, {N}>, Consumer<'rb, T, U, C, {N}>) {
         (
             Producer {
                 rb: unsafe { NonNull::new_unchecked(self) },
@@ -30,19 +27,17 @@ where
 
 /// A queue "consumer"; it can dequeue items from the queue
 // NOTE the consumer semantically owns the `head` pointer of the queue
-pub struct Consumer<'a, T, N, U = usize, C = MultiCore>
+pub struct Consumer<'a, T, U = usize, C = MultiCore, const N: usize>
 where
-    N: ArrayLength<T>,
     U: sealed::Uxx,
     C: sealed::XCore,
 {
-    rb: NonNull<Queue<T, N, U, C>>,
+    rb: NonNull<Queue<T, U, C, {N}>>,
     _marker: PhantomData<&'a ()>,
 }
 
-unsafe impl<'a, T, N, U, C> Send for Consumer<'a, T, N, U, C>
+unsafe impl<'a, T, U, C, const N: usize> Send for Consumer<'a, T, U, C, {N}>
 where
-    N: ArrayLength<T>,
     T: Send,
     U: sealed::Uxx,
     C: sealed::XCore,
@@ -51,29 +46,26 @@ where
 
 /// A queue "producer"; it can enqueue items into the queue
 // NOTE the producer semantically owns the `tail` pointer of the queue
-pub struct Producer<'a, T, N, U = usize, C = MultiCore>
+pub struct Producer<'a, T, U = usize, C = MultiCore, const N: usize>
 where
-    N: ArrayLength<T>,
     U: sealed::Uxx,
     C: sealed::XCore,
 {
-    rb: NonNull<Queue<T, N, U, C>>,
+    rb: NonNull<Queue<T, U, C, {N}>>,
     _marker: PhantomData<&'a ()>,
 }
-
-unsafe impl<'a, T, N, U> Send for Producer<'a, T, N, U>
+/*
+unsafe impl<'a, T, U, const N: usize> Send for Producer<'a, T, U, {N}>
 where
-    N: ArrayLength<T>,
     T: Send,
     U: sealed::Uxx,
 {
-}
+}*/
 
 macro_rules! impl_ {
     ($uxx:ident) => {
-        impl<'a, T, N, C> Consumer<'a, T, N, $uxx, C>
+        impl<'a, T, C, const N: usize> Consumer<'a, T, $uxx, C, {N}>
         where
-            N: ArrayLength<T>,
             C: sealed::XCore,
         {
             /// Returns if there are any items to dequeue. When this returns true, at least the
@@ -120,9 +112,8 @@ macro_rules! impl_ {
             }
         }
 
-        impl<'a, T, N, C> Producer<'a, T, N, $uxx, C>
+        impl<'a, T, C, const N: usize> Producer<'a, T, $uxx, C, {N}>
         where
-            N: ArrayLength<T>,
             C: sealed::XCore,
         {
             /// Returns if there is any space to enqueue a new item. When this returns true, at
@@ -191,18 +182,18 @@ macro_rules! impl_ {
         }
     };
 }
-
+/*
 impl_!(u8);
 impl_!(u16);
 impl_!(usize);
-
+*/
 #[cfg(test)]
 mod tests {
     use crate::{consts::*, spsc::Queue};
 
     #[test]
     fn sanity() {
-        let mut rb: Queue<i32, U2> = Queue::new();
+        let mut rb: Queue<i32, 2> = Queue::new();
 
         let (mut p, mut c) = rb.split();
 

@@ -1,135 +1,4 @@
-use core::{fmt, hash, iter::FromIterator, mem::MaybeUninit, ops, ptr, slice};
-
-use generic_array::{ArrayLength, GenericArray};
-use hash32;
-
-impl<A> crate::i::Vec<A> {
-    /// `Vec` `const` constructor; wrap the returned value in [`Vec`](../struct.Vec.html)
-    pub const fn new() -> Self {
-        Self {
-            buffer: MaybeUninit::uninit(),
-            len: 0,
-        }
-    }
-}
-
-impl<T, N> crate::i::Vec<GenericArray<T, N>>
-where
-    N: ArrayLength<T>,
-{
-    pub(crate) fn as_slice(&self) -> &[T] {
-        // NOTE(unsafe) avoid bound checks in the slicing operation
-        // &buffer[..self.len]
-        unsafe { slice::from_raw_parts(self.buffer.as_ptr() as *const T, self.len) }
-    }
-
-    pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
-        // NOTE(unsafe) avoid bound checks in the slicing operation
-        // &mut buffer[..len]
-        unsafe { slice::from_raw_parts_mut(self.buffer.as_mut_ptr() as *mut T, self.len) }
-    }
-
-    pub(crate) fn capacity(&self) -> usize {
-        N::to_usize()
-    }
-
-    pub(crate) fn clear(&mut self) {
-        self.truncate(0);
-    }
-
-    pub(crate) fn clone(&self) -> Self
-    where
-        T: Clone,
-    {
-        let mut new = Self::new();
-        new.extend_from_slice(self.as_slice()).unwrap();
-        new
-    }
-
-    pub(crate) fn extend<I>(&mut self, iter: I)
-    where
-        I: IntoIterator<Item = T>,
-    {
-        for elem in iter {
-            self.push(elem).ok().unwrap()
-        }
-    }
-
-    pub(crate) fn extend_from_slice(&mut self, other: &[T]) -> Result<(), ()>
-    where
-        T: Clone,
-    {
-        if self.len + other.len() > self.capacity() {
-            // won't fit in the `Vec`; don't modify anything and return an error
-            Err(())
-        } else {
-            for elem in other {
-                unsafe {
-                    self.push_unchecked(elem.clone());
-                }
-            }
-            Ok(())
-        }
-    }
-
-    pub(crate) fn is_full(&self) -> bool {
-        self.len == self.capacity()
-    }
-
-    pub(crate) unsafe fn pop_unchecked(&mut self) -> T {
-        debug_assert!(!self.as_slice().is_empty());
-
-        self.len -= 1;
-        (self.buffer.as_ptr() as *const T).add(self.len).read()
-    }
-
-    pub(crate) fn push(&mut self, item: T) -> Result<(), T> {
-        if self.len < self.capacity() {
-            unsafe { self.push_unchecked(item) }
-            Ok(())
-        } else {
-            Err(item)
-        }
-    }
-
-    pub(crate) unsafe fn push_unchecked(&mut self, item: T) {
-        // NOTE(ptr::write) the memory slot that we are about to write to is uninitialized. We
-        // use `ptr::write` to avoid running `T`'s destructor on the uninitialized memory
-        (self.buffer.as_mut_ptr() as *mut T)
-            .add(self.len)
-            .write(item);
-
-        self.len += 1;
-    }
-
-    unsafe fn swap_remove_unchecked(&mut self, index: usize) -> T {
-        let length = self.len;
-        debug_assert!(index < length);
-        ptr::swap(
-            self.as_mut_slice().get_unchecked_mut(index),
-            self.as_mut_slice().get_unchecked_mut(length - 1),
-        );
-        self.pop_unchecked()
-    }
-
-    pub(crate) fn swap_remove(&mut self, index: usize) -> T {
-        assert!(index < self.len);
-        unsafe { self.swap_remove_unchecked(index) }
-    }
-
-    pub(crate) fn truncate(&mut self, len: usize) {
-        unsafe {
-            // drop any extra elements
-            while len < self.len {
-                // decrement len before the drop_in_place(), so a panic on Drop
-                // doesn't re-drop the just-failed value.
-                self.len -= 1;
-                let len = self.len;
-                ptr::drop_in_place(self.as_mut_slice().get_unchecked_mut(len));
-            }
-        }
-    }
-}
+use core::{fmt, hash, mem::MaybeUninit/*, iter::FromIterator*/, ops, ptr, slice};
 
 /// A fixed capacity [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html)
 ///
@@ -137,10 +6,9 @@ where
 ///
 /// ```
 /// use heapless::Vec;
-/// use heapless::consts::*;
 ///
 /// // A vector with a fixed capacity of 8 elements allocated on the stack
-/// let mut vec = Vec::<_, U8>::new();
+/// let mut vec = Vec::<_, 8>::new();
 /// vec.push(1);
 /// vec.push(2);
 ///
@@ -160,52 +28,40 @@ where
 /// }
 /// assert_eq!(vec, [7, 1, 2, 3]);
 /// ```
-pub struct Vec<T, N>(#[doc(hidden)] pub crate::i::Vec<GenericArray<T, N>>)
-where
-    N: ArrayLength<T>;
-
-impl<T, N> Clone for Vec<T, N>
-where
-    N: ArrayLength<T>,
-    T: Clone,
-{
-    fn clone(&self) -> Self {
-        Vec(self.0.clone())
-    }
+pub struct Vec<T, const N: usize> {
+    pub(crate) buffer: MaybeUninit<[T; {N}]>,
+    pub(crate) len: usize,
 }
 
-impl<T, N> Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
-    /* Constructors */
+impl<T, const N: usize> Vec<T, {N}> {
     /// Constructs a new, empty vector with a fixed capacity of `N`
     ///
     /// # Examples
     ///
     /// ```
     /// use heapless::Vec;
-    /// use heapless::consts::*;
     ///
     /// // allocate the vector on the stack
-    /// let mut x: Vec<u8, U16> = Vec::new();
+    /// let mut x: Vec<u8, 16> = Vec::new();
     ///
     /// // allocate the vector in a static variable
-    /// static mut X: Vec<u8, U16> = Vec(heapless::i::Vec::new());
+    /// static mut X: Vec<u8, 16> = Vec(heapless::i::Vec::new());
     /// ```
-    pub fn new() -> Self {
-        Vec(crate::i::Vec::new())
+    pub const fn new() -> Self {
+        Self {
+            buffer: MaybeUninit::<[T; {N}]>::uninit(),
+            len: 0,
+        }
     }
 
-    /* Public API */
     /// Returns the maximum number of elements the vector can hold
-    pub fn capacity(&self) -> usize {
-        self.0.capacity()
+    pub const fn capacity(&self) -> usize {
+        N
     }
 
     /// Clears the vector, removing all values.
     pub fn clear(&mut self) {
-        self.0.clear()
+        self.truncate(0);
     }
 
     /// Clones and appends all elements in a slice to the `Vec`.
@@ -217,9 +73,8 @@ where
     ///
     /// ```
     /// use heapless::Vec;
-    /// use heapless::consts::*;
     ///
-    /// let mut vec = Vec::<u8, U8>::new();
+    /// let mut vec = Vec::<u8, 8>::new();
     /// vec.push(1).unwrap();
     /// vec.extend_from_slice(&[2, 3, 4]).unwrap();
     /// assert_eq!(*vec, [1, 2, 3, 4]);
@@ -228,13 +83,32 @@ where
     where
         T: Clone,
     {
-        self.0.extend_from_slice(other)
+        if self.len + other.len() > self.capacity() {
+            // won't fit in the `Vec`; don't modify anything and return an error
+            Err(())
+        } else {
+            for elem in other {
+                unsafe {
+                    self.push_unchecked(elem.clone());
+                }
+            }
+            Ok(())
+        }
+    }
+
+    pub(crate) fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = T>,
+    {
+        for elem in iter {
+            self.push(elem).ok().unwrap()
+        }
     }
 
     /// Removes the last element from a vector and return it, or `None` if it's empty
     pub fn pop(&mut self) -> Option<T> {
-        if self.0.len != 0 {
-            Some(unsafe { self.0.pop_unchecked() })
+        if self.len != 0 {
+            Some(unsafe { self.pop_unchecked() })
         } else {
             None
         }
@@ -244,23 +118,41 @@ where
     ///
     /// Returns back the `item` if the vector is full
     pub fn push(&mut self, item: T) -> Result<(), T> {
-        self.0.push(item)
+        if self.len < self.capacity() {
+            unsafe { self.push_unchecked(item) }
+            Ok(())
+        } else {
+            Err(item)
+        }
     }
 
     pub(crate) unsafe fn push_unchecked(&mut self, item: T) {
-        self.0.push_unchecked(item)
+        // NOTE(ptr::write) the memory slot that we are about to write to is uninitialized. We
+        // use `ptr::write` to avoid running `T`'s destructor on the uninitialized memory
+        (self.buffer.as_mut_ptr() as *mut T)
+            .add(self.len)
+            .write(item);
+
+        self.len += 1;
+    }
+
+    pub(crate) unsafe fn pop_unchecked(&mut self) -> T {
+        debug_assert!(!self.as_slice().is_empty());
+
+        self.len -= 1;
+        (self.buffer.as_ptr() as *const T).add(self.len).read()
     }
 
     /// Shortens the vector, keeping the first `len` elements and dropping the rest.
     pub fn truncate(&mut self, len: usize) {
         unsafe {
             // drop any extra elements
-            while len < self.len() {
+            while len < self.len {
                 // decrement len before the drop_in_place(), so a panic on Drop
                 // doesn't re-drop the just-failed value.
-                self.0.len -= 1;
-                let len = self.len();
-                ptr::drop_in_place(self.get_unchecked_mut(len));
+                self.len -= 1;
+                let len = self.len;
+                ptr::drop_in_place(self.as_mut_slice().get_unchecked_mut(len));
             }
         }
     }
@@ -319,9 +211,8 @@ where
     ///
     /// ```
     /// use heapless::Vec;
-    /// use heapless::consts::*;
     ///
-    /// let mut v: Vec<_, U8> = Vec::new();
+    /// let mut v: Vec<_, 8> = Vec::new();
     /// v.push("foo").unwrap();
     /// v.push("bar").unwrap();
     /// v.push("baz").unwrap();
@@ -334,62 +225,88 @@ where
     /// assert_eq!(&*v, ["baz", "qux"]);
     /// ```
     pub fn swap_remove(&mut self, index: usize) -> T {
-        self.0.swap_remove(index)
+        assert!(index < self.len);
+        unsafe { self.swap_remove_unchecked(index) }
     }
 
     pub(crate) unsafe fn swap_remove_unchecked(&mut self, index: usize) -> T {
-        self.0.swap_remove_unchecked(index)
+        let length = self.len;
+        debug_assert!(index < length);
+        ptr::swap(
+            self.as_mut_slice().get_unchecked_mut(index),
+            self.as_mut_slice().get_unchecked_mut(length - 1),
+        );
+        self.pop_unchecked()
     }
 
-    pub(crate) fn is_full(&self) -> bool {
-        self.0.is_full()
+    pub(crate) fn as_slice(&self) -> &[T] {
+        // NOTE(unsafe) avoid bound checks in the slicing operation
+        // &buffer[..self.len]
+        unsafe { slice::from_raw_parts(self.buffer.as_ptr() as *const T, self.len) }
+    }
+
+    pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
+        // NOTE(unsafe) avoid bound checks in the slicing operation
+        // &mut buffer[..len]
+        unsafe { slice::from_raw_parts_mut(self.buffer.as_mut_ptr() as *mut T, self.len) }
+    }
+/*
+    pub(crate) fn clone(&self) -> Self
+    where
+        T: Clone,
+    {
+        let mut new = Self::new();
+        new.extend_from_slice(self.as_slice()).unwrap();
+        new
+    }
+*/
+
+    pub fn is_full(&self) -> bool {
+        self.len == self.capacity()
+    }
+
+
+    
+    pub fn len(&self) -> usize {
+        self.len
     }
 }
 
-impl<T, N> Default for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+
+/*
+impl<T, const N: usize> Default for Vec<T, {N}> {
     fn default() -> Self {
         Self::new()
     }
 }
-
-impl<T, N> fmt::Debug for Vec<T, N>
+*/
+impl<T, const N: usize> fmt::Debug for Vec<T, {N}>
 where
     T: fmt::Debug,
-    N: ArrayLength<T>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         <[T] as fmt::Debug>::fmt(self, f)
     }
 }
 
-impl<T, N> Drop for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> Drop for Vec<T, {N}> {
     fn drop(&mut self) {
         unsafe { ptr::drop_in_place(&mut self[..]) }
     }
 }
 
-impl<T, N> Extend<T> for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> Extend<T> for  Vec<T, {N}> {
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>,
     {
-        self.0.extend(iter)
+        self.extend(iter)
     }
 }
 
-impl<'a, T, N> Extend<&'a T> for Vec<T, N>
+impl<'a, T, const N: usize> Extend<&'a T> for Vec<T, {N}>
 where
     T: 'a + Copy,
-    N: ArrayLength<T>,
 {
     fn extend<I>(&mut self, iter: I)
     where
@@ -399,30 +316,25 @@ where
     }
 }
 
-impl<T, N> hash::Hash for Vec<T, N>
+impl<'a, T, const N: usize> hash::Hash for Vec<T, {N}>
 where
     T: core::hash::Hash,
-    N: ArrayLength<T>,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         <[T] as hash::Hash>::hash(self, state)
     }
 }
 
-impl<T, N> hash32::Hash for Vec<T, N>
+impl<'a, T, const N: usize> hash32::Hash for Vec<T, {N}>
 where
     T: hash32::Hash,
-    N: ArrayLength<T>,
 {
     fn hash<H: hash32::Hasher>(&self, state: &mut H) {
         <[T] as hash32::Hash>::hash(self, state)
     }
 }
 
-impl<'a, T, N> IntoIterator for &'a Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<'a, T, const N: usize> IntoIterator for &'a Vec<T, {N}> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
@@ -431,10 +343,7 @@ where
     }
 }
 
-impl<'a, T, N> IntoIterator for &'a mut Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<'a, T, const N: usize> IntoIterator for &'a mut Vec<T, {N}> {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
@@ -442,11 +351,8 @@ where
         self.iter_mut()
     }
 }
-
-impl<T, N> FromIterator<T> for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+/*
+impl<T, const N: usize> FromIterator<T> for Vec<T, {N}> {
     fn from_iter<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = T>,
@@ -457,7 +363,7 @@ where
         }
         vec
     }
-}
+}*/
 
 /// An iterator that moves out of an [`Vec`][`Vec`].
 ///
@@ -465,23 +371,17 @@ where
 ///
 /// [`Vec`]: (https://doc.rust-lang.org/std/vec/struct.Vec.html)
 ///
-pub struct IntoIter<T, N>
-where
-    N: ArrayLength<T>,
-{
-    vec: Vec<T, N>,
+pub struct IntoIter<T, const N: usize> {
+    vec: Vec<T, {N}>,
     next: usize,
 }
 
-impl<T, N> Iterator for IntoIter<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> Iterator for IntoIter<T, {N}> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         if self.next < self.vec.len() {
             let item = unsafe {
-                (self.vec.0.buffer.as_ptr() as *const T)
+                (self.vec.buffer.as_ptr() as *const T)
                     .add(self.next)
                     .read()
             };
@@ -492,11 +392,10 @@ where
         }
     }
 }
-
-impl<T, N> Clone for IntoIter<T, N>
+/*
+impl<T, const N: usize> Clone for IntoIter<T, {N}>
 where
     T: Clone,
-    N: ArrayLength<T>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -505,50 +404,41 @@ where
         }
     }
 }
-
-impl<T, N> Drop for IntoIter<T, N>
-where
-    N: ArrayLength<T>,
-{
+*/
+impl<T, const N: usize> Drop for IntoIter<T, {N}> {
     fn drop(&mut self) {
         unsafe {
             // Drop all the elements that have not been moved out of vec
             ptr::drop_in_place(&mut self.vec[self.next..]);
             // Prevent dropping of other elements
-            self.vec.0.len = 0;
+            self.vec.len = 0;
         }
     }
 }
 
-impl<T, N> IntoIterator for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> IntoIterator for Vec<T, {N}> {
     type Item = T;
-    type IntoIter = IntoIter<T, N>;
+    type IntoIter = IntoIter<T, {N}>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter { vec: self, next: 0 }
     }
 }
 
-impl<A, B, N1, N2> PartialEq<Vec<B, N2>> for Vec<A, N1>
+impl<A, B, const N1: usize, const N2: usize> PartialEq<Vec<B, {N2}>> for Vec<A, {N1}>
 where
-    N1: ArrayLength<A>,
-    N2: ArrayLength<B>,
     A: PartialEq<B>,
 {
-    fn eq(&self, other: &Vec<B, N2>) -> bool {
+    fn eq(&self, other: &Vec<B, {N2}>) -> bool {
         <[A]>::eq(self, &**other)
     }
 }
 
 macro_rules! eq {
     ($Lhs:ty, $Rhs:ty) => {
-        impl<'a, 'b, A, B, N> PartialEq<$Rhs> for $Lhs
+        impl<'a, 'b, A, B, const N: usize> PartialEq<$Rhs> for $Lhs
         where
             A: PartialEq<B>,
-            N: ArrayLength<A>,
         {
             fn eq(&self, other: &$Rhs) -> bool {
                 <[A]>::eq(self, &other[..])
@@ -557,98 +447,69 @@ macro_rules! eq {
     };
 }
 
-eq!(Vec<A, N>, [B]);
-eq!(Vec<A, N>, &'a [B]);
-eq!(Vec<A, N>, &'a mut [B]);
+eq!(Vec<A, {N}>, [B]);
+eq!(Vec<A, {N}>, &'a [B]);
+eq!(Vec<A, {N}>, &'a mut [B]);
 
-macro_rules! array {
-    ($($N:expr),+) => {
-        $(
-            eq!(Vec<A, N>, [B; $N]);
-            eq!(Vec<A, N>, &'a [B; $N]);
-        )+
-    }
-}
+eq!(Vec<A, {N}>, [B; {N}]);
+eq!(Vec<A, {N}>, &'a [B; {N}]);
 
-array!(
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-    26, 27, 28, 29, 30, 31, 32
-);
-
-impl<T, N> Eq for Vec<T, N>
+impl<T, const N: usize> Eq for Vec<T, {N}>
 where
-    N: ArrayLength<T>,
     T: Eq,
 {
 }
 
-impl<T, N> ops::Deref for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> ops::Deref for Vec<T, {N}> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
-        self.0.as_slice()
+        self.as_slice()
     }
 }
 
-impl<T, N> ops::DerefMut for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> ops::DerefMut for Vec<T, {N}> {
     fn deref_mut(&mut self) -> &mut [T] {
-        self.0.as_mut_slice()
+        self.as_mut_slice()
     }
 }
 
-impl<T, N> AsRef<Vec<T, N>> for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> AsRef<Vec<T, {N}>> for Vec<T, {N}> {
     #[inline]
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<T, N> AsMut<Vec<T, N>> for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> AsMut<Vec<T, {N}>> for Vec<T, {N}> {
     #[inline]
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<T, N> AsRef<[T]> for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> AsRef<[T]> for Vec<T, {N}> {
     #[inline]
     fn as_ref(&self) -> &[T] {
         self
     }
 }
 
-impl<T, N> AsMut<[T]> for Vec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> AsMut<[T]> for Vec<T, {N}> {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
         self
     }
 }
 
+
 #[cfg(test)]
 mod tests {
-    use crate::{consts::*, Vec};
+    use crate::Vec;
 
     #[test]
     fn static_new() {
-        static mut _V: Vec<i32, U4> = Vec(crate::i::Vec::new());
+        static mut _V: Vec<i32, 4> = Vec::new();
     }
 
     macro_rules! droppable {
@@ -679,7 +540,7 @@ mod tests {
         droppable!();
 
         {
-            let mut v: Vec<Droppable, U2> = Vec::new();
+            let mut v: Vec<Droppable, 2> = Vec::new();
             v.push(Droppable::new()).ok().unwrap();
             v.push(Droppable::new()).ok().unwrap();
             v.pop().unwrap();
@@ -688,7 +549,7 @@ mod tests {
         assert_eq!(unsafe { COUNT }, 0);
 
         {
-            let mut v: Vec<Droppable, U2> = Vec::new();
+            let mut v: Vec<Droppable, 2> = Vec::new();
             v.push(Droppable::new()).ok().unwrap();
             v.push(Droppable::new()).ok().unwrap();
         }
@@ -698,8 +559,8 @@ mod tests {
 
     #[test]
     fn eq() {
-        let mut xs: Vec<i32, U4> = Vec::new();
-        let mut ys: Vec<i32, U8> = Vec::new();
+        let mut xs: Vec<i32, 4> = Vec::new();
+        let mut ys: Vec<i32, 8> = Vec::new();
 
         assert_eq!(xs, ys);
 
@@ -711,7 +572,7 @@ mod tests {
 
     #[test]
     fn full() {
-        let mut v: Vec<i32, U4> = Vec::new();
+        let mut v: Vec<i32, 4> = Vec::new();
 
         v.push(0).unwrap();
         v.push(1).unwrap();
@@ -723,7 +584,7 @@ mod tests {
 
     #[test]
     fn iter() {
-        let mut v: Vec<i32, U4> = Vec::new();
+        let mut v: Vec<i32, 4> = Vec::new();
 
         v.push(0).unwrap();
         v.push(1).unwrap();
@@ -741,7 +602,7 @@ mod tests {
 
     #[test]
     fn iter_mut() {
-        let mut v: Vec<i32, U4> = Vec::new();
+        let mut v: Vec<i32, 4> = Vec::new();
 
         v.push(0).unwrap();
         v.push(1).unwrap();
@@ -760,7 +621,7 @@ mod tests {
     #[test]
     fn collect_from_iter() {
         let slice = &[1, 2, 3];
-        let vec = slice.iter().cloned().collect::<Vec<_, U4>>();
+        let vec = slice.iter().cloned().collect::<Vec<_, 4>>();
         assert_eq!(vec, slice);
     }
 
@@ -768,12 +629,12 @@ mod tests {
     #[should_panic]
     fn collect_from_iter_overfull() {
         let slice = &[1, 2, 3];
-        let _vec = slice.iter().cloned().collect::<Vec<_, U2>>();
+        let _vec = slice.iter().cloned().collect::<Vec<_, 2>>();
     }
 
     #[test]
     fn iter_move() {
-        let mut v: Vec<i32, U4> = Vec::new();
+        let mut v: Vec<i32, 4> = Vec::new();
         v.push(0).unwrap();
         v.push(1).unwrap();
         v.push(2).unwrap();
@@ -793,7 +654,7 @@ mod tests {
         droppable!();
 
         {
-            let mut vec: Vec<Droppable, U2> = Vec::new();
+            let mut vec: Vec<Droppable, 2> = Vec::new();
             vec.push(Droppable::new()).ok().unwrap();
             vec.push(Droppable::new()).ok().unwrap();
             let mut items = vec.into_iter();
@@ -805,7 +666,7 @@ mod tests {
         assert_eq!(unsafe { COUNT }, 0);
 
         {
-            let mut vec: Vec<Droppable, U2> = Vec::new();
+            let mut vec: Vec<Droppable, 2> = Vec::new();
             vec.push(Droppable::new()).ok().unwrap();
             vec.push(Droppable::new()).ok().unwrap();
             let _items = vec.into_iter();
@@ -815,7 +676,7 @@ mod tests {
         assert_eq!(unsafe { COUNT }, 0);
 
         {
-            let mut vec: Vec<Droppable, U2> = Vec::new();
+            let mut vec: Vec<Droppable, 2> = Vec::new();
             vec.push(Droppable::new()).ok().unwrap();
             vec.push(Droppable::new()).ok().unwrap();
             let mut items = vec.into_iter();
@@ -827,7 +688,7 @@ mod tests {
 
     #[test]
     fn push_and_pop() {
-        let mut v: Vec<i32, U4> = Vec::new();
+        let mut v: Vec<i32, 4> = Vec::new();
         assert_eq!(v.len(), 0);
 
         assert_eq!(v.pop(), None);
@@ -845,7 +706,7 @@ mod tests {
 
     #[test]
     fn resize_size_limit() {
-        let mut v: Vec<u8, U4> = Vec::new();
+        let mut v: Vec<u8, 4> = Vec::new();
 
         v.resize(0, 0).unwrap();
         v.resize(4, 0).unwrap();
@@ -854,7 +715,7 @@ mod tests {
 
     #[test]
     fn resize_length_cases() {
-        let mut v: Vec<u8, U4> = Vec::new();
+        let mut v: Vec<u8, 4> = Vec::new();
 
         assert_eq!(v.len(), 0);
 
@@ -881,7 +742,7 @@ mod tests {
 
     #[test]
     fn resize_contents() {
-        let mut v: Vec<u8, U4> = Vec::new();
+        let mut v: Vec<u8, 4> = Vec::new();
 
         // New entries take supplied value when growing
         v.resize(1, 17).unwrap();
@@ -904,7 +765,7 @@ mod tests {
 
     #[test]
     fn resize_default() {
-        let mut v: Vec<u8, U4> = Vec::new();
+        let mut v: Vec<u8, 4> = Vec::new();
 
         // resize_default is implemented using resize, so just check the
         // correct value is being written.

@@ -65,14 +65,13 @@
 //! It *might* compile on older versions but that may change in any new patch release.
 
 #![cfg_attr(not(test), no_std)]
-#![deny(missing_docs)]
+#![feature(const_generics)]
+//#![deny(missing_docs)]
 #![deny(rust_2018_compatibility)]
 #![deny(rust_2018_idioms)]
-#![deny(warnings)]
+//#![deny(warnings)]
 
 pub use binary_heap::BinaryHeap;
-pub use generic_array::typenum::consts;
-pub use generic_array::ArrayLength;
 pub use indexmap::{FnvIndexMap, IndexMap};
 pub use indexset::{FnvIndexSet, IndexSet};
 pub use linear_map::LinearMap;
@@ -92,7 +91,6 @@ mod de;
 mod ser;
 
 pub mod binary_heap;
-pub mod i;
 #[cfg(not(armv6m))]
 pub mod mpmc;
 #[cfg(not(armv6m))]
