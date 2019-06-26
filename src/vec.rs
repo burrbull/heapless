@@ -1,4 +1,4 @@
-use core::{fmt, hash, mem::MaybeUninit/*, iter::FromIterator*/, ops, ptr, slice};
+use core::{fmt, hash, mem::MaybeUninit, iter::FromIterator, ops, ptr, slice};
 
 /// A fixed capacity [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html)
 ///
@@ -45,7 +45,7 @@ impl<T, const N: usize> Vec<T, {N}> {
     /// let mut x: Vec<u8, 16> = Vec::new();
     ///
     /// // allocate the vector in a static variable
-    /// static mut X: Vec<u8, 16> = Vec(heapless::i::Vec::new());
+    /// static mut X: Vec<u8, 16> = Vec::new();
     /// ```
     pub const fn new() -> Self {
         Self {
@@ -250,7 +250,7 @@ impl<T, const N: usize> Vec<T, {N}> {
         // &mut buffer[..len]
         unsafe { slice::from_raw_parts_mut(self.buffer.as_mut_ptr() as *mut T, self.len) }
     }
-/*
+
     pub(crate) fn clone(&self) -> Self
     where
         T: Clone,
@@ -259,27 +259,18 @@ impl<T, const N: usize> Vec<T, {N}> {
         new.extend_from_slice(self.as_slice()).unwrap();
         new
     }
-*/
 
-    pub fn is_full(&self) -> bool {
+    pub(crate) fn is_full(&self) -> bool {
         self.len == self.capacity()
-    }
-
-
-    
-    pub fn len(&self) -> usize {
-        self.len
     }
 }
 
-
-/*
 impl<T, const N: usize> Default for Vec<T, {N}> {
     fn default() -> Self {
         Self::new()
     }
 }
-*/
+
 impl<T, const N: usize> fmt::Debug for Vec<T, {N}>
 where
     T: fmt::Debug,
@@ -351,7 +342,7 @@ impl<'a, T, const N: usize> IntoIterator for &'a mut Vec<T, {N}> {
         self.iter_mut()
     }
 }
-/*
+
 impl<T, const N: usize> FromIterator<T> for Vec<T, {N}> {
     fn from_iter<I>(iter: I) -> Self
     where
@@ -363,7 +354,7 @@ impl<T, const N: usize> FromIterator<T> for Vec<T, {N}> {
         }
         vec
     }
-}*/
+}
 
 /// An iterator that moves out of an [`Vec`][`Vec`].
 ///
@@ -392,7 +383,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, {N}> {
         }
     }
 }
-/*
+
 impl<T, const N: usize> Clone for IntoIter<T, {N}>
 where
     T: Clone,
@@ -404,7 +395,7 @@ where
         }
     }
 }
-*/
+
 impl<T, const N: usize> Drop for IntoIter<T, {N}> {
     fn drop(&mut self) {
         unsafe {
@@ -447,12 +438,25 @@ macro_rules! eq {
     };
 }
 
+macro_rules! eq1 {
+    ($Lhs:ty, $Rhs:ty) => {
+        impl<'a, 'b, A, B, const N1: usize, const N2: usize> PartialEq<$Rhs> for $Lhs
+        where
+            A: PartialEq<B>,
+        {
+            fn eq(&self, other: &$Rhs) -> bool {
+                <[A]>::eq(self, &other[..])
+            }
+        }
+    };
+}
+
 eq!(Vec<A, {N}>, [B]);
 eq!(Vec<A, {N}>, &'a [B]);
 eq!(Vec<A, {N}>, &'a mut [B]);
 
-eq!(Vec<A, {N}>, [B; {N}]);
-eq!(Vec<A, {N}>, &'a [B; {N}]);
+eq1!(Vec<A, {N1}>, [B; {N2}]);
+eq1!(Vec<A, {N1}>, &'a [B; {N2}]);
 
 impl<T, const N: usize> Eq for Vec<T, {N}>
 where
@@ -501,7 +505,6 @@ impl<T, const N: usize> AsMut<[T]> for Vec<T, {N}> {
         self
     }
 }
-
 
 #[cfg(test)]
 mod tests {

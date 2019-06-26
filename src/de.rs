@@ -5,7 +5,6 @@ use serde::de::{self, Deserialize, Deserializer, Error, MapAccess, SeqAccess};
 
 use crate::{
     sealed::binary_heap::Kind as BinaryHeapKind,
-    indexmap::{Bucket, Pos},
     BinaryHeap, IndexMap, IndexSet, LinearMap, String, Vec,
 };
 
@@ -20,7 +19,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        struct ValueVisitor<'de, T, KIND, const N: usize>(PhantomData<(&'de (), T, KIND, {N})>);
+        struct ValueVisitor<'de, T, KIND, const N: usize>(PhantomData<(&'de (), T, KIND)>);
 
         impl<'de, T, KIND, const N: usize> de::Visitor<'de> for ValueVisitor<'de, T, KIND, {N}>
         where
@@ -56,19 +55,19 @@ impl<'de, T, S, const N: usize> Deserialize<'de> for IndexSet<T, BuildHasherDefa
 where
     T: Eq + Hash + Deserialize<'de>,
     S: Hasher + Default,
-//    N: ArrayLength<Bucket<T, ()>> + ArrayLength<Option<Pos>> + PowerOfTwo,
+//    N: PowerOfTwo,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct ValueVisitor<'de, T, S, const N: usize>(PhantomData<(&'de (), T, S, {N})>);
+        struct ValueVisitor<'de, T, S, const N: usize>(PhantomData<(&'de (), T, S)>);
 
         impl<'de, T, S, const N: usize> de::Visitor<'de> for ValueVisitor<'de, T, S, {N}>
         where
             T: Eq + Hash + Deserialize<'de>,
             S: Hasher + Default,
-//            N: ArrayLength<Bucket<T, ()>> + ArrayLength<Option<Pos>> + PowerOfTwo,
+//            N: PowerOfTwo,
         {
             type Value = IndexSet<T, BuildHasherDefault<S>, {N}>;
 
@@ -103,7 +102,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        struct ValueVisitor<'de, T, const N: usize>(PhantomData<(&'de (), T, {N})>);
+        struct ValueVisitor<'de, T, const N: usize>(PhantomData<(&'de (), T)>);
 
         impl<'de, T, const N: usize> de::Visitor<'de> for ValueVisitor<'de, T, {N}>
         where
@@ -140,20 +139,20 @@ impl<'de, K, V, S, const N: usize> Deserialize<'de> for IndexMap<K, V, BuildHash
 where
     K: Eq + Hash + Deserialize<'de>,
     V: Deserialize<'de>,
-//    N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>> + PowerOfTwo,
+//    N: PowerOfTwo,
     S: Default + Hasher,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct ValueVisitor<'de, K, V, S, const N: usize>(PhantomData<(&'de (), K, V, S, {N})>);
+        struct ValueVisitor<'de, K, V, S, const N: usize>(PhantomData<(&'de (), K, V, S)>);
 
         impl<'de, K, V, S, const N: usize> de::Visitor<'de> for ValueVisitor<'de, K, V, S, {N}>
         where
             K: Eq + Hash + Deserialize<'de>,
             V: Deserialize<'de>,
-//            N: ArrayLength<Bucket<K, V>> + ArrayLength<Option<Pos>> + PowerOfTwo,
+//            N: PowerOfTwo,
             S: Default + Hasher,
         {
             type Value = IndexMap<K, V, BuildHasherDefault<S>, {N}>;
@@ -190,7 +189,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        struct ValueVisitor<'de, K, V, const N: usize>(PhantomData<(&'de (), K, V, {N})>);
+        struct ValueVisitor<'de, K, V, const N: usize>(PhantomData<(&'de (), K, V)>);
 
         impl<'de, K, V, const N: usize> de::Visitor<'de> for ValueVisitor<'de, K, V, {N}>
         where
@@ -229,7 +228,7 @@ impl<'de, const N: usize> Deserialize<'de> for String<{N}> {
     where
         D: Deserializer<'de>,
     {
-        struct ValueVisitor<'de, {N}>(PhantomData<(&'de (), {N})>);
+        struct ValueVisitor<'de, const N: usize>(PhantomData<(&'de ())>);
 
         impl<'de, const N: usize> de::Visitor<'de> for ValueVisitor<'de, {N}> {
             type Value = String<{N}>;
@@ -266,6 +265,6 @@ impl<'de, const N: usize> Deserialize<'de> for String<{N}> {
             }
         }
 
-        deserializer.deserialize_str(ValueVisitor::<'de, const N: usize>(PhantomData))
+        deserializer.deserialize_str(ValueVisitor::<'de, {N}>(PhantomData))
     }
 }

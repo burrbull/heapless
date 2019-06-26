@@ -1,4 +1,4 @@
-use core::{borrow::Borrow, fmt/*, iter::FromIterator*/, mem, ops, ptr, slice};
+use core::{borrow::Borrow, fmt, iter::FromIterator, mem, ops, ptr, slice};
 
 use crate::Vec;
 
@@ -16,7 +16,7 @@ impl<K, V, const N: usize> LinearMap<K, V, {N}>
 where
     K: Eq,
 {
-/*    /// Creates an empty `LinearMap`
+    /// Creates an empty `LinearMap`
     ///
     /// # Examples
     ///
@@ -27,13 +27,13 @@ where
     /// let mut map: LinearMap<&str, isize, 8> = LinearMap::new();
     ///
     /// // allocate the map in a static variable
-    /// static mut MAP: LinearMap<&str, isize, 8> = LinearMap(heapless::i::LinearMap::new());
+    /// static mut MAP: LinearMap<&str, isize, 8> = LinearMap::new();
     /// ```
     pub const fn new() -> Self {
         Self {
             buffer: Vec::new(),
         }
-    }*/
+    }
     
     /// Returns the number of elements that the map can hold
     ///
@@ -369,7 +369,7 @@ where
         self.get_mut(key).expect("no entry found for key")
     }
 }
-/*
+
 impl<K, V, const N: usize> Default for LinearMap<K, V, {N}>
 where
     K: Eq,
@@ -378,18 +378,18 @@ where
         Self::new()
     }
 }
-*/
-/*impl<K, V, const N: usize> Clone for LinearMap<K, V, {N}>
+
+impl<K, V, const N: usize> Clone for LinearMap<K, V, {N}>
 where
     K: Eq + Clone,
     V: Clone,
 {
     fn clone(&self) -> Self {
-        Self(crate::i::LinearMap {
+        Self {
             buffer: self.buffer.clone(),
-        })
+        }
     }
-}*/
+}
 
 impl<K, V, const N: usize> fmt::Debug for LinearMap<K, V, {N}>
 where
@@ -400,7 +400,7 @@ where
         f.debug_map().entries(self.iter()).finish()
     }
 }
-/*
+
 impl<K, V, const N: usize> FromIterator<(K, V)> for LinearMap<K, V, {N}>
 where
     K: Eq,
@@ -414,7 +414,7 @@ where
         out
     }
 }
-*/
+
 pub struct IntoIter<K, V, const N: usize>
 where
     K: Eq,
@@ -523,14 +523,13 @@ where
 {
 }
 
-
 #[cfg(test)]
 mod test {
-    use crate::{consts::*, LinearMap};
+    use crate::LinearMap;
 
     #[test]
     fn static_new() {
-        static mut _L: LinearMap<i32, i32, 8> = LinearMap(crate::i::LinearMap::new());
+        static mut _L: LinearMap<i32, i32, 8> = LinearMap::new();
     }
 
     #[test]

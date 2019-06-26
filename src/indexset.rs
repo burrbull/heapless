@@ -1,9 +1,9 @@
-use core::{borrow::Borrow, fmt/*, iter::FromIterator*/};
+use core::{borrow::Borrow, fmt, iter::FromIterator};
 
-//use generic_array::{typenum::PowerOfTwo, ArrayLength};
-use hash32::{BuildHasher, BuildHasherDefault, FnvHasher, Hash/*, Hasher*/};
+//use generic_array::{typenum::PowerOfTwo};
+use hash32::{BuildHasher, BuildHasherDefault, FnvHasher, Hash, Hasher};
 
-use crate::indexmap::{self/*, Bucket*/, IndexMap/*, Pos*/};
+use crate::indexmap::{self, IndexMap};
 
 /// An `IndexSet` using the default FNV hasher
 pub type FnvIndexSet<T, const N: usize> = IndexSet<T, BuildHasherDefault<FnvHasher>, {N}>;
@@ -46,12 +46,12 @@ where
 {
     map: IndexMap<T, (), S, {N}>,
 }
-/*
+
 impl<T, S, const N: usize> IndexSet<T, BuildHasherDefault<S>, {N}>
 where
     T: Eq + Hash,
     S: Default + Hasher,
-//    N: ArrayLength<Bucket<T, ()>> + ArrayLength<Option<Pos>> + PowerOfTwo,
+//    N: PowerOfTwo,
 {
     /// Creates an empty `IndexSet`
     pub fn new() -> Self {
@@ -59,7 +59,7 @@ where
             map: IndexMap::new(),
         }
     }
-}*/
+}
 
 impl<T, S, const N: usize> IndexSet<T, S, {N}>
 where
@@ -425,7 +425,7 @@ where
         self.map.remove(value).is_some()
     }
 }
-/*
+
 impl<T, S, const N: usize> Clone for IndexSet<T, S, {N}>
 where
     T: Eq + Hash + Clone,
@@ -436,7 +436,7 @@ where
             map: self.map.clone(),
         }
     }
-}*/
+}
 
 impl<T, S, const N: usize> fmt::Debug for IndexSet<T, S, {N}>
 where
@@ -447,7 +447,7 @@ where
         f.debug_set().entries(self.iter()).finish()
     }
 }
-/*
+
 impl<T, S, const N: usize> Default for IndexSet<T, S, {N}>
 where
     T: Eq + Hash,
@@ -458,7 +458,7 @@ where
             map: <_>::default(),
         }
     }
-}*/
+}
 
 impl<T, S1, S2, const N1: usize, const N2: usize> PartialEq<IndexSet<T, S2, {N2}>> for IndexSet<T, S1, {N1}>
 where
@@ -496,7 +496,7 @@ where
         self.extend(iterable.into_iter().cloned())
     }
 }
-/*
+
 impl<T, S, const N: usize> FromIterator<T> for IndexSet<T, S, {N}>
 where
     T: Eq + Hash,
@@ -510,7 +510,7 @@ where
         set.extend(iter);
         set
     }
-}*/
+}
 
 impl<'a, T, S, const N: usize> IntoIterator for &'a IndexSet<T, S, {N}>
 where

@@ -1,4 +1,4 @@
-use core::{fmt, hash, mem, ops, str/*, str::Utf8Error*/};
+use core::{fmt, fmt::Write, hash, mem, ops, str, str::Utf8Error};
 
 use hash32;
 
@@ -10,7 +10,7 @@ pub struct String<const N: usize> {
 }
 
 impl<const N: usize> String<{N}> {
-/*    /// Constructs a new, empty `String` with a fixed capacity of `N`
+    /// Constructs a new, empty `String` with a fixed capacity of `N`
     ///
     /// # Examples
     ///
@@ -23,7 +23,7 @@ impl<const N: usize> String<{N}> {
     /// let mut s: String<4> = String::new();
     ///
     /// // allocate the string in a static variable
-    /// static mut S: String<4> = String(heapless::i::String::new());
+    /// static mut S: String<4> = String::new();
     /// ```
     #[inline]
     pub const fn new() -> Self {
@@ -31,8 +31,8 @@ impl<const N: usize> String<{N}> {
             vec: Vec::new(),
         }
     }
-*/
-/*    /// Converts a vector of bytes into a `String`.
+
+    /// Converts a vector of bytes into a `String`.
     ///
     /// A string slice ([`&str`]) is made of bytes ([`u8`]), and a vector of bytes
     /// ([`Vec<u8>`]) is made of bytes, so this function converts between the
@@ -78,7 +78,7 @@ impl<const N: usize> String<{N}> {
 
         Ok(unsafe { String::from_utf8_unchecked(vec) })
     }
-*/
+
     /// Converts a vector of bytes to a `String` without checking that the
     /// string contains valid UTF-8.
     ///
@@ -314,18 +314,14 @@ impl<const N: usize> String<{N}> {
     pub fn clear(&mut self) {
         self.vec.clear()
     }
-
-    pub fn len(&self) -> usize {
-        self.vec.len()
-    }
 }
-/*
+
 impl<const N: usize> Default for String<{N}> {
     fn default() -> Self {
         Self::new()
     }
-}*/
-/*
+}
+
 impl<'a, const N: usize> From<&'a str> for String<{N}> {
     fn from(s: &'a str) -> Self {
         let mut new = String::new();
@@ -342,17 +338,15 @@ impl<const N: usize> str::FromStr for String<{N}> {
         new.push_str(s)?;
         Ok(new)
     }
-}*/
-/*
-impl<const N: usize> Clone for String<N> {
+}
+
+impl<const N: usize> Clone for String<{N}> {
     fn clone(&self) -> Self {
-        Self(crate::i::String {
-            vec: self.vec.clone(),
-        })
+        Self {
+            vec: self.vec.clone()
+        }
     }
-}*/
-
-
+}
 
 impl<const N: usize> fmt::Debug for String<{N}> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -459,19 +453,14 @@ impl_eq! { String<{N}>, &'a str }
 
 impl<const N: usize> Eq for String<{N}> {}
 
-
-
-
-
-
-/*
 macro_rules! impl_from_num {
-    ($num:ty, $size:literal) => {
-        impl<const N: usize> From<$num> for String<{N}>
-        where
-            N: ArrayLength<u8> + IsGreaterOrEqual<$size, Output = True>,
+    ($num:ty, $size:literal, $N:ident) => {
+        impl<const $N: usize> From<$num> for String<{$N}>
+        //where
+        //    N: ArrayLength<u8> + IsGreaterOrEqual<$size, Output = True>,
         {
             fn from(s: $num) -> Self {
+                assert!($N >= $size);
                 let mut new = String::new();
                 write!(&mut new, "{}", s).unwrap();
                 new
@@ -480,19 +469,19 @@ macro_rules! impl_from_num {
     };
 }
 
-impl_from_num!(i8, 4);
-impl_from_num!(i16, 6);
-impl_from_num!(i32, 11);
-impl_from_num!(i64, 20);
+impl_from_num!(i8, 4, N);
+impl_from_num!(i16, 6, N);
+impl_from_num!(i32, 11, N);
+impl_from_num!(i64, 20, N);
 
-impl_from_num!(u8, 3);
-impl_from_num!(u16, 5);
-impl_from_num!(u32, 10);
-impl_from_num!(u64, 20);
-*/
+impl_from_num!(u8, 3, N);
+impl_from_num!(u16, 5, N);
+impl_from_num!(u32, 10, N);
+impl_from_num!(u64, 20, N);
+
 #[cfg(test)]
 mod tests {
-    use crate::{consts::*, String, Vec};
+    use crate::{String, Vec};
 
     #[test]
     fn static_new() {

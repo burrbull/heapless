@@ -23,7 +23,7 @@
 //! ```
 //! use heapless::spsc::Queue;
 //!
-//! static mut Q: Queue<Event, 4> = Queue(heapless::i::Queue::new());
+//! static mut Q: Queue<Event, 4> = Queue::new();
 //!
 //! enum Event { A, B }
 //!
@@ -206,7 +206,7 @@ where
         tail.wrapping_sub(head)
     }
 }
-/*
+
 impl<T, U, C, const N: usize> Drop for Queue<T, U, C, {N}>
 where
     U: sealed::Uxx,
@@ -219,8 +219,8 @@ where
             }
         }
     }
-}*/
-/*
+}
+
 impl<T, U, C, const N: usize> fmt::Debug for Queue<T, U, C, {N}>
 where
     T: fmt::Debug,
@@ -230,8 +230,8 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
-}*/
-/*
+}
+
 impl<T, U, C, const N: usize> hash::Hash for Queue<T, U, C, {N}>
 where
     T: hash::Hash,
@@ -244,8 +244,8 @@ where
             hash::Hash::hash(t, state);
         }
     }
-}*/
-/*
+}
+
 impl<T, U, C, const N: usize> hash32::Hash for Queue<T, U, C, {N}>
 where
     T: hash32::Hash,
@@ -258,8 +258,8 @@ where
             hash32::Hash::hash(t, state);
         }
     }
-}*/
-/*
+}
+
 impl<'a, T, U, C, const N: usize> IntoIterator for &'a Queue<T, U, C, {N}>
 where
     U: sealed::Uxx,
@@ -284,11 +284,11 @@ where
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
-}*/
+}
 
 macro_rules! impl_ {
-    ($uxx:ident, $uxx_sc:ident) => {
-        impl<T, const N: usize> Queue<T, $uxx, MultiCore, {N}> {
+    ($uxx:ident, $uxx_sc:ident, $N:ident) => {
+        impl<T, const $N: usize> Queue<T, $uxx, MultiCore, {$N}> {
             /// Creates an empty queue with a fixed capacity of `N`
             pub const fn $uxx() -> Self {
                 Self {
@@ -299,7 +299,7 @@ macro_rules! impl_ {
             }
         }
 
-        impl<T, const N: usize> Queue<T, $uxx, SingleCore, {N}> {
+        impl<T, const $N: usize> Queue<T, $uxx, SingleCore, {$N}> {
             /// Creates an empty queue with a fixed capacity of `N` (single core variant)
             pub const unsafe fn $uxx_sc() -> Self {
                 Self {
@@ -310,7 +310,7 @@ macro_rules! impl_ {
             }
         }
 
-        impl<T, C, const N: usize> Queue<T, $uxx, C, {N}>
+        impl<T, C, const $N: usize> Queue<T, $uxx, C, {$N}>
         where
             C: sealed::XCore,
         {
@@ -382,13 +382,13 @@ macro_rules! impl_ {
             }
         }
 
-        impl<T, C, const N: usize> Clone for Queue<T, $uxx, C, {N}>
+        impl<T, C, const $N: usize> Clone for Queue<T, $uxx, C, {$N}>
         where
             T: Clone,
             C: sealed::XCore,
         {
             fn clone(&self) -> Self {
-                let mut new: Queue<T, $uxx, C, {N}> = Queue {
+                let mut new: Queue<T, $uxx, C, {$N}> = Queue {
                     buffer: MaybeUninit::uninit(),
                     head: Atomic::new(0),
                     tail: Atomic::new(0),
@@ -403,10 +403,10 @@ macro_rules! impl_ {
                 }
                 new
             }
-        }*/
+        }
     };
 }
-/*
+
 impl<T, const N: usize> Queue<T, usize, MultiCore, {N}> {
     /// Alias for [`spsc::Queue::usize`](struct.Queue.html#method.usize)
     pub const fn new() -> Self {
@@ -419,13 +419,13 @@ impl<T, const N: usize> Queue<T, usize, SingleCore, {N}> {
     pub const unsafe fn new_sc() -> Self {
         Queue::usize_sc()
     }
-}*/
-/*
-impl_!(u8, u8_sc);
-impl_!(u16, u16_sc);
-impl_!(usize, usize_sc);
-*/
-/*impl<T, U, C, U2, C2, const N: usize, const N2: usize> PartialEq<Queue<T, U2, C2, {N2}>> for Queue<T, U, C, {N}>
+}
+
+impl_!(u8, u8_sc, N);
+impl_!(u16, u16_sc, N);
+impl_!(usize, usize_sc, N);
+
+impl<T, U, C, U2, C2, const N: usize, const N2: usize> PartialEq<Queue<T, U2, C2, {N2}>> for Queue<T, U, C, {N}>
 where
     T: PartialEq,
     U: sealed::Uxx,
@@ -437,15 +437,15 @@ where
         self.len_usize() == other.len_usize()
             && self.iter().zip(other.iter()).all(|(v1, v2)| v1 == v2)
     }
-}*/
-/*
+}
+
 impl<T, U, C, const N: usize> Eq for Queue<T, U, C, {N}>
 where
     T: Eq,
     U: sealed::Uxx,
     C: sealed::XCore,
 {
-}*/
+}
 
 /// An iterator over the items of a queue
 pub struct Iter<'a, T, U, C, const N: usize>
@@ -484,8 +484,8 @@ where
 }
 
 macro_rules! iterator {
-    (struct $name:ident -> $elem:ty, $ptr:ty, $asptr:ident, $mkref:ident) => {
-        impl<'a, T, U, C, const N: usize> Iterator for $name<'a, T, U, C, {N}>
+    (struct $name:ident -> $elem:ty, $ptr:ty, $asptr:ident, $mkref:ident, $N:ident) => {
+        impl<'a, T, U, C, const $N: usize> Iterator for $name<'a, T, U, C, {$N}>
         where
             U: sealed::Uxx,
             C: sealed::XCore,
@@ -520,19 +520,19 @@ macro_rules! make_ref_mut {
         &mut ($e)
     };
 }
+
+iterator!(struct Iter -> &'a T, *const T, as_ptr, make_ref, N);
+iterator!(struct IterMut -> &'a mut T, *mut T, as_mut_ptr, make_ref_mut, N);
 /*
-iterator!(struct Iter -> &'a T, *const T, as_ptr, make_ref);
-iterator!(struct IterMut -> &'a mut T, *mut T, as_mut_ptr, make_ref_mut);
-*/
 #[cfg(test)]
 mod tests {
     use hash32::Hasher;
 
-    use crate::{consts::*, spsc::Queue};
+    use crate::spsc::Queue;
 
     #[test]
     fn static_new() {
-        static mut _Q: Queue<i32, 4> = Queue::new();
+        static mut _Q: Queue<i32, 4> = Queue::<i32, 4>::new();
     }
 
     #[test]
@@ -760,3 +760,4 @@ mod tests {
     }
 
 }
+*/

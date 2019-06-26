@@ -54,32 +54,33 @@ where
     rb: NonNull<Queue<T, U, C, {N}>>,
     _marker: PhantomData<&'a ()>,
 }
-/*
-unsafe impl<'a, T, U, const N: usize> Send for Producer<'a, T, U, {N}>
+
+unsafe impl<'a, T, U, C, const N: usize> Send for Producer<'a, T, U, C, {N}>
 where
     T: Send,
     U: sealed::Uxx,
+    C: sealed::XCore,
 {
-}*/
+}
 
 macro_rules! impl_ {
-    ($uxx:ident) => {
-        impl<'a, T, C, const N: usize> Consumer<'a, T, $uxx, C, {N}>
+    ($uxx:ident, $N:ident) => {
+        impl<'a, T, C, const $N: usize> Consumer<'a, T, $uxx, C, {$N}>
         where
             C: sealed::XCore,
         {
             /// Returns if there are any items to dequeue. When this returns true, at least the
             /// first subsequent dequeue will succeed.
             pub fn ready(&self) -> bool {
-                let head = unsafe { self.rb.as_ref().0.head.load_relaxed() };
-                let tail = unsafe { self.rb.as_ref().0.tail.load_acquire() }; // ▼
+                let head = unsafe { self.rb.as_ref().head.load_relaxed() };
+                let tail = unsafe { self.rb.as_ref().tail.load_acquire() }; // ▼
                 return head != tail;
             }
 
             /// Returns the item in the front of the queue, or `None` if the queue is empty
             pub fn dequeue(&mut self) -> Option<T> {
-                let head = unsafe { self.rb.as_ref().0.head.load_relaxed() };
-                let tail = unsafe { self.rb.as_ref().0.tail.load_acquire() }; // ▼
+                let head = unsafe { self.rb.as_ref().head.load_relaxed() };
+                let tail = unsafe { self.rb.as_ref().tail.load_acquire() }; // ▼
 
                 if head != tail {
                     Some(unsafe { self._dequeue(head) }) // ▲
@@ -94,8 +95,8 @@ macro_rules! impl_ {
             ///
             /// If the queue is empty this is equivalent to calling `mem::uninitialized`
             pub unsafe fn dequeue_unchecked(&mut self) -> T {
-                let head = self.rb.as_ref().0.head.load_relaxed();
-                debug_assert_ne!(head, self.rb.as_ref().0.tail.load_acquire());
+                let head = self.rb.as_ref().head.load_relaxed();
+                debug_assert_ne!(head, self.rb.as_ref().tail.load_acquire());
                 self._dequeue(head) // ▲
             }
 
@@ -104,15 +105,15 @@ macro_rules! impl_ {
 
                 let cap = rb.capacity();
 
-                let item = (rb.0.buffer.as_ptr() as *const T)
+                let item = (rb.buffer.as_ptr() as *const T)
                     .add(usize::from(head % cap))
                     .read();
-                rb.0.head.store_release(head.wrapping_add(1)); // ▲
+                rb.head.store_release(head.wrapping_add(1)); // ▲
                 item
             }
         }
 
-        impl<'a, T, C, const N: usize> Producer<'a, T, $uxx, C, {N}>
+        impl<'a, T, C, const $N: usize> Producer<'a, T, $uxx, C, {$N}>
         where
             C: sealed::XCore,
         {
@@ -121,13 +122,13 @@ macro_rules! impl_ {
             pub fn ready(&self) -> bool {
                 let cap = unsafe { self.rb.as_ref().capacity() };
 
-                let tail = unsafe { self.rb.as_ref().0.tail.load_relaxed() };
+                let tail = unsafe { self.rb.as_ref().tail.load_relaxed() };
                 // NOTE we could replace this `load_acquire` with a `load_relaxed` and this method
                 // would be sound on most architectures but that change would result in UB according
                 // to the C++ memory model, which is what Rust currently uses, so we err on the side
                 // of caution and stick to `load_acquire`. Check issue google#sanitizers#882 for
                 // more details.
-                let head = unsafe { self.rb.as_ref().0.head.load_acquire() };
+                let head = unsafe { self.rb.as_ref().head.load_acquire() };
                 return head.wrapping_add(cap) != tail;
             }
 
@@ -136,13 +137,13 @@ macro_rules! impl_ {
             /// Returns back the `item` if the queue is full
             pub fn enqueue(&mut self, item: T) -> Result<(), T> {
                 let cap = unsafe { self.rb.as_ref().capacity() };
-                let tail = unsafe { self.rb.as_ref().0.tail.load_relaxed() };
+                let tail = unsafe { self.rb.as_ref().tail.load_relaxed() };
                 // NOTE we could replace this `load_acquire` with a `load_relaxed` and this method
                 // would be sound on most architectures but that change would result in UB according
                 // to the C++ memory model, which is what Rust currently uses, so we err on the side
                 // of caution and stick to `load_acquire`. Check issue google#sanitizers#882 for
                 // more details.
-                let head = unsafe { self.rb.as_ref().0.head.load_acquire() }; // ▼
+                let head = unsafe { self.rb.as_ref().head.load_acquire() }; // ▼
 
                 if tail.wrapping_sub(head) > cap - 1 {
                     Err(item)
@@ -161,8 +162,8 @@ macro_rules! impl_ {
             /// to create a copy of `item`, which could result in `T`'s destructor running on `item`
             /// twice.
             pub unsafe fn enqueue_unchecked(&mut self, item: T) {
-                let tail = self.rb.as_ref().0.tail.load_relaxed();
-                debug_assert_ne!(tail.wrapping_add(1), self.rb.as_ref().0.head.load_acquire());
+                let tail = self.rb.as_ref().tail.load_relaxed();
+                debug_assert_ne!(tail.wrapping_add(1), self.rb.as_ref().head.load_acquire());
                 self._enqueue(tail, item); // ▲
             }
 
@@ -174,22 +175,22 @@ macro_rules! impl_ {
                 // NOTE(ptr::write) the memory slot that we are about to write to is
                 // uninitialized. We use `ptr::write` to avoid running `T`'s destructor on the
                 // uninitialized memory
-                (rb.0.buffer.as_mut_ptr() as *mut T)
+                (rb.buffer.as_mut_ptr() as *mut T)
                     .add(usize::from(tail % cap))
                     .write(item);
-                rb.0.tail.store_release(tail.wrapping_add(1)); // ▲
+                rb.tail.store_release(tail.wrapping_add(1)); // ▲
             }
         }
     };
 }
+
+impl_!(u8, N);
+impl_!(u16, N);
+impl_!(usize, N);
 /*
-impl_!(u8);
-impl_!(u16);
-impl_!(usize);
-*/
 #[cfg(test)]
 mod tests {
-    use crate::{consts::*, spsc::Queue};
+    use crate::spsc::Queue;
 
     #[test]
     fn sanity() {
@@ -204,3 +205,4 @@ mod tests {
         assert_eq!(c.dequeue(), Some(0));
     }
 }
+*/

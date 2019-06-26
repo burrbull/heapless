@@ -35,7 +35,7 @@ pub enum Max {}
 /// ```
 /// use heapless::binary_heap::{BinaryHeap, Max};
 ///
-/// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+/// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
 ///
 /// // We can use peek to look at the next item in the heap. In this case,
 /// // there's no items in there yet so we get None.
@@ -85,17 +85,17 @@ where
     K: Kind,
 {
     /* Constructors */
-/*    /// Creates an empty BinaryHeap as a $K-heap.
+    /// Creates an empty BinaryHeap as a $K-heap.
     ///
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
     /// // allocate the binary heap on the stack
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     /// heap.push(4).unwrap();
     ///
     /// // allocate the binary heap in a static variable
-    /// static mut HEAP: BinaryHeap<i32, 8, Max> = BinaryHeap(heapless::i::BinaryHeap::new());
+    /// static mut HEAP: BinaryHeap<i32, Max, 8> = BinaryHeap::new();
     /// ```
     pub const fn new() -> Self {
         Self {
@@ -103,7 +103,7 @@ where
             data: Vec::new(),
         }
     }
-*/
+
     /* Public API */
     /// Returns the capacity of the binary heap.
     pub fn capacity(&self) -> usize {
@@ -115,7 +115,7 @@ where
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     /// heap.push(1).unwrap();
     /// heap.push(3).unwrap();
     ///
@@ -134,7 +134,7 @@ where
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     /// heap.push(1).unwrap();
     /// heap.push(3).unwrap();
     ///
@@ -149,7 +149,7 @@ where
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     ///
     /// assert!(heap.is_empty());
     ///
@@ -168,7 +168,7 @@ where
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     /// heap.push(1).unwrap();
     /// heap.push(2).unwrap();
     /// heap.push(3).unwrap();
@@ -198,7 +198,7 @@ where
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     /// assert_eq!(heap.peek(), None);
     ///
     /// heap.push(1).unwrap();
@@ -216,7 +216,7 @@ where
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     /// heap.push(1).unwrap();
     /// heap.push(3).unwrap();
     ///
@@ -249,7 +249,7 @@ where
     /// ```
     /// use heapless::binary_heap::{BinaryHeap, Max};
     ///
-    /// let mut heap: BinaryHeap<_, 8, Max> = BinaryHeap::new();
+    /// let mut heap: BinaryHeap<_, Max, 8> = BinaryHeap::new();
     /// heap.push(3).unwrap();
     /// heap.push(5).unwrap();
     /// heap.push(1).unwrap();
@@ -382,7 +382,7 @@ impl<'a, T> Drop for Hole<'a, T> {
         }
     }
 }
-/*
+
 impl<T, K, const N: usize> Default for BinaryHeap<T, K, {N}>
 where
     T: Ord,
@@ -391,8 +391,8 @@ where
     fn default() -> Self {
         Self::new()
     }
-}*/
-/*
+}
+
 impl<T, K, const N: usize> Clone for BinaryHeap<T, K, {N}>
 where
     K: Kind,
@@ -404,7 +404,7 @@ where
             data: self.data.clone(),
         }
     }
-}*/
+}
 
 impl<T, K, const N: usize> Drop for BinaryHeap<T, K, {N}>
 where
@@ -443,19 +443,16 @@ where
 mod tests {
     use std::vec::Vec;
 
-    use crate::{
-        binary_heap::{self, BinaryHeap, Min},
-        consts::*,
-    };
+    use crate::binary_heap::{self, BinaryHeap, Min};
 
     #[test]
     fn static_new() {
-        static mut _B: BinaryHeap<i32, 16, Min> = BinaryHeap(crate::i::BinaryHeap::new());
+        static mut _B: BinaryHeap<i32, Min, 16> = BinaryHeap::new();
     }
 
     #[test]
     fn min() {
-        let mut heap = BinaryHeap::<_, 16, Min>::new();
+        let mut heap = BinaryHeap::<_, Min, 16>::new();
         heap.push(1).unwrap();
         heap.push(2).unwrap();
         heap.push(3).unwrap();
@@ -491,7 +488,7 @@ mod tests {
 
     #[test]
     fn max() {
-        let mut heap = BinaryHeap::<_, 16, binary_heap::Max>::new();
+        let mut heap = BinaryHeap::<_, binary_heap::Max, 16>::new();
         heap.push(1).unwrap();
         heap.push(2).unwrap();
         heap.push(3).unwrap();

@@ -13,17 +13,16 @@
 //!
 //! ```
 //! use heapless::Vec; // fixed capacity `std::Vec`
-//! use heapless::consts::U8; // type level integer used to specify capacity
 //!
 //! // on the stack
-//! let mut xs: Vec<u8, U8> = Vec::new(); // can hold up to 8 elements
+//! let mut xs: Vec<u8, 8> = Vec::new(); // can hold up to 8 elements
 //! xs.push(42).unwrap();
 //! assert_eq!(xs.pop(), Some(42));
 //!
 //! // in a `static` variable
 //! // (because `const-fn` has not been fully stabilized you need to use the helper structs in
 //! // the `i` module, which must be wrapped in a tuple struct)
-//! static mut XS: Vec<u8, U8> = Vec(heapless::i::Vec::new());
+//! static mut XS: Vec<u8, 8> = Vec::new();
 //!
 //! let xs = unsafe { &mut XS };
 //!
@@ -31,7 +30,7 @@
 //! assert_eq!(xs.pop(), Some(42));
 //!
 //! // in the heap (though kind of pointless because no reallocation)
-//! let mut ys: Box<Vec<u8, U8>> = Box::new(Vec::new());
+//! let mut ys: Box<Vec<u8, 8>> = Box::new(Vec::new());
 //! ys.push(42).unwrap();
 //! assert_eq!(ys.pop(), Some(42));
 //! ```
@@ -66,7 +65,8 @@
 
 #![cfg_attr(not(test), no_std)]
 #![feature(const_generics)]
-//#![deny(missing_docs)]
+#![feature(const_fn)]
+#![deny(missing_docs)]
 #![deny(rust_2018_compatibility)]
 #![deny(rust_2018_idioms)]
 //#![deny(warnings)]

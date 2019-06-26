@@ -1,8 +1,8 @@
 use core::{
     borrow::Borrow,
     fmt,
-    /*iter::FromIterator,*/
-    mem::{self/*, MaybeUninit*/},
+    iter::FromIterator,
+    mem::{self, MaybeUninit},
     num::NonZeroU32,
     ops, slice,
 };
@@ -96,28 +96,28 @@ impl<K, V, const N: usize> CoreMap<K, V, {N}>
 where
     K: Eq + Hash,
 {
-/*    // TODO turn into a `const fn`; needs `mem::zeroed` to be a `const fn`
+    // TODO turn into a `const fn`; needs `mem::zeroed` to be a `const fn`
     fn new() -> Self {
         CoreMap {
             entries: Vec::new(),
             indices: unsafe { MaybeUninit::zeroed().assume_init() },
         }
     }
-*/
-/*    fn capacity() -> usize {
+
+    fn capacity() -> usize {
         N
     }
 
     fn mask() -> usize {
-        N - 1
+        Self::capacity() - 1
     }
-*/
+
     fn find<Q>(&self, hash: HashValue, query: &Q) -> Option<(usize, usize)>
     where
         K: Borrow<Q>,
         Q: ?Sized + Eq,
     {
-        let mut probe = hash.desired_pos(N-1); // Self::mask()
+        let mut probe = hash.desired_pos(Self::mask());
         let mut dist = 0;
 
         probe_loop!(probe < self.indices.len(), {
@@ -127,7 +127,7 @@ where
                 let i = pos.index();
                 debug_assert!(i < self.entries.len());
 
-                if dist > entry_hash.probe_distance(N-1, probe) {//Self::mask()
+                if dist > entry_hash.probe_distance(Self::mask(), probe) {
                     // give up when probe distance is too long
                     return None;
                 } else if entry_hash == hash
@@ -150,7 +150,7 @@ where
     // When we insert they key, it might be that we need to continue displacing
     // entries (robin hood hashing), in which case Inserted::RobinHood is returned
     fn insert_phase_1(&mut self, hash: HashValue, key: K, value: V) -> Inserted<V> {
-        let mut probe = hash.desired_pos(N-1); //Self::mask()
+        let mut probe = hash.desired_pos(Self::mask());
         let mut dist = 0;
 
         let inserted;
@@ -163,7 +163,7 @@ where
                 let i = pos.index();
                 debug_assert!(i < self.entries.len());
 
-                let their_dist = entry_hash.probe_distance(N-1, probe); //Self::mask()
+                let their_dist = entry_hash.probe_distance(Self::mask(), probe);
 
                 if their_dist < dist {
                     // robin hood: steal the spot if it's better for us
@@ -267,7 +267,7 @@ where
         });
     }
 }
-/*
+
 impl<K, V, const N: usize> Clone for CoreMap<K, V, {N}>
 where
     K: Eq + Hash + Clone,
@@ -279,7 +279,7 @@ where
             indices: self.indices.clone(),
         }
     }
-}*/
+}
 
 /// Fixed capacity [`IndexMap`](https://docs.rs/indexmap/1/indexmap/map/struct.IndexMap.html)
 ///
@@ -329,7 +329,7 @@ where
     core: CoreMap<K, V, {N}>,
     build_hasher: S,
 }
-/*
+
 impl<K, V, S, const N: usize> IndexMap<K, V, BuildHasherDefault<S>, {N}>
 where
     K: Eq + Hash,
@@ -346,7 +346,7 @@ where
             core: CoreMap::new(),
         }
     }
-}*/
+}
 
 impl<K, V, S, const N: usize> IndexMap<K, V, S, {N}>
 where
@@ -719,7 +719,7 @@ where
         self.get_mut(key).expect("key not found")
     }
 }
-/*
+
 impl<K, V, S, const N: usize> Clone for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash + Clone,
@@ -732,7 +732,7 @@ where
             build_hasher: self.build_hasher.clone(),
         }
     }
-}*/
+}
 
 impl<K, V, S, const N: usize> fmt::Debug for IndexMap<K, V, S, {N}>
 where
@@ -744,7 +744,7 @@ where
         f.debug_map().entries(self.iter()).finish()
     }
 }
-/*
+
 impl<K, V, S, const N: usize> Default for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
@@ -756,7 +756,7 @@ where
             core: CoreMap::new(),
         }
     }
-}*/
+}
 
 impl<K, V, S, S2, const N: usize, const N2: usize> PartialEq<IndexMap<K, V, S2, {N2}>> for IndexMap<K, V, S, {N}>
 where
@@ -809,7 +809,7 @@ where
         self.extend(iterable.into_iter().map(|(&key, &value)| (key, value)))
     }
 }
-/*
+
 impl<K, V, S, const N: usize> FromIterator<(K, V)> for IndexMap<K, V, S, {N}>
 where
     K: Eq + Hash,
@@ -823,7 +823,7 @@ where
         map.extend(iterable);
         map
     }
-}*/
+}
 
 impl<'a, K, V, S, const N: usize> IntoIterator for &'a IndexMap<K, V, S, {N}>
 where
@@ -897,26 +897,24 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::mem;
+    //use core::mem;
 
-    use generic_array::typenum::Unsigned;
+    use crate::{FnvIndexMap};
 
-    use crate::{consts::*, FnvIndexMap};
-
-    #[test]
+    /*#[test]
     fn size() {
         const CAP: usize = 4;
 
         assert_eq!(
             mem::size_of::<FnvIndexMap<i16, u16, CAP>>(),
-            cap * mem::size_of::<u32>() + // indices
-                cap * (mem::size_of::<i16>() + // key
+            CAP * mem::size_of::<u32>() + // indices
+                CAP * (mem::size_of::<i16>() + // key
                      mem::size_of::<u16>() + // value
                      mem::size_of::<u16>() // hash
                 ) + // buckets
                 mem::size_of::<usize>() // entries.length
         )
-    }
+    }*/
 
     #[test]
     fn partial_eq() {

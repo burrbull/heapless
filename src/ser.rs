@@ -3,7 +3,6 @@ use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 use crate::{
     sealed::binary_heap::Kind as BinaryHeapKind,
-    indexmap::{Bucket, Pos},
     BinaryHeap, IndexMap, IndexSet, LinearMap, String, Vec,
 };
 
@@ -30,7 +29,7 @@ impl<T, S, const N: usize> Serialize for IndexSet<T, S, {N}>
 where
     T: Eq + Hash + Serialize,
     S: BuildHasher,
-//    N: ArrayLength<Bucket<T, ()>> + ArrayLength<Option<Pos>> + PowerOfTwo,
+//    N: PowerOfTwo,
 {
     fn serialize<SER>(&self, serializer: SER) -> Result<SER::Ok, SER::Error>
     where

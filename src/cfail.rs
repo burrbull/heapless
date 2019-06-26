@@ -7,7 +7,6 @@
 //! ```
 //! use heapless::Vec;
 //! use heapless::spsc::{Consumer, Queue, Producer};
-//! use heapless::consts::*;
 //!
 //! struct IsSend;
 //!
@@ -15,10 +14,10 @@
 //!
 //! fn is_send<T>() where T: Send {}
 //!
-//! is_send::<Consumer<IsSend, U4>>();
-//! is_send::<Producer<IsSend, U4>>();
-//! is_send::<Queue<IsSend, U4>>();
-//! is_send::<Vec<IsSend, U4>>();
+//! is_send::<Consumer<IsSend, 4>>();
+//! is_send::<Producer<IsSend, 4>>();
+//! is_send::<Queue<IsSend, 4>>();
+//! is_send::<Vec<IsSend, 4>>();
 //! ```
 //!
 //! Collections of non-`Send`-able things are *not* `Send`
@@ -26,25 +25,23 @@
 //! ``` compile_fail
 //! use std::marker::PhantomData;
 //! use heapless::ring_buffer::Consumer;
-//! use heapless::consts::*;
 //!
 //! type NotSend = PhantomData<*const ()>;
 //!
 //! fn is_send<T>() where T: Send {}
 //!
-//! is_send::<Consumer<NotSend, U4>>();
+//! is_send::<Consumer<NotSend, 4>>();
 //! ```
 //!
 //! ``` compile_fail
 //! use std::marker::PhantomData;
 //! use heapless::ring_buffer::Producer;
-//! use heapless::consts::*;
 //!
 //! type NotSend = PhantomData<*const ()>;
 //!
 //! fn is_send<T>() where T: Send {}
 //!
-//! is_send::<Producer<NotSend, U4>>();
+//! is_send::<Producer<NotSend, 4>>();
 //! ```
 //!
 //! ``` compile_fail
