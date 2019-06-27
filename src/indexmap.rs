@@ -897,16 +897,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    //use core::mem;
+    use core::mem;
 
     use crate::{FnvIndexMap};
 
-    /*#[test]
+    #[test]
     fn size() {
         const CAP: usize = 4;
 
         assert_eq!(
-            mem::size_of::<FnvIndexMap<i16, u16, CAP>>(),
+            mem::size_of::<FnvIndexMap<i16, u16, {CAP}>>(),
             CAP * mem::size_of::<u32>() + // indices
                 CAP * (mem::size_of::<i16>() + // key
                      mem::size_of::<u16>() + // value
@@ -914,7 +914,7 @@ mod tests {
                 ) + // buckets
                 mem::size_of::<usize>() // entries.length
         )
-    }*/
+    }
 
     #[test]
     fn partial_eq() {

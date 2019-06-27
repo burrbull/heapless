@@ -265,6 +265,20 @@ impl<T, const N: usize> Vec<T, {N}> {
     }
 }
 
+impl<T, const N: usize> as_slice::AsSlice for Vec<T, {N}> {
+    type Element = T;
+
+    fn as_slice(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl<T, const N: usize> as_slice::AsMutSlice for Vec<T, {N}> {
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
+}
+
 impl<T, const N: usize> Default for Vec<T, {N}> {
     fn default() -> Self {
         Self::new()
