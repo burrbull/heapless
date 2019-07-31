@@ -64,8 +64,8 @@ where
 }
 
 macro_rules! impl_ {
-    ($uxx:ident, $N:ident) => {
-        impl<'a, T, C, const $N: usize> Consumer<'a, T, $uxx, C, {$N}>
+    ($uxx:ident) => {
+        impl<'a, T, C, const N: usize> Consumer<'a, T, $uxx, C, {N}>
         where
             C: sealed::XCore,
         {
@@ -113,7 +113,7 @@ macro_rules! impl_ {
             }
         }
 
-        impl<'a, T, C, const $N: usize> Producer<'a, T, $uxx, C, {$N}>
+        impl<'a, T, C, const N: usize> Producer<'a, T, $uxx, C, {N}>
         where
             C: sealed::XCore,
         {
@@ -184,9 +184,9 @@ macro_rules! impl_ {
     };
 }
 
-impl_!(u8, N);
-impl_!(u16, N);
-impl_!(usize, N);
+impl_!(u8);
+impl_!(u16);
+impl_!(usize);
 /*
 #[cfg(test)]
 mod tests {

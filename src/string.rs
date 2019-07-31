@@ -423,8 +423,8 @@ impl<const N1: usize, const N2: usize> PartialEq<String<{N2}>> for String<{N1}> 
 }
 
 macro_rules! impl_eq {
-    ($lhs:ty, $rhs:ty) => {
-        impl<'a, 'b, const N: usize> PartialEq<$rhs> for $lhs {
+    ($rhs:ty) => {
+        impl<'a, 'b, const N: usize> PartialEq<$rhs> for String<{N}> {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool {
                 str::eq(&self[..], &other[..])
@@ -435,32 +435,32 @@ macro_rules! impl_eq {
             }
         }
 
-        impl<'a, 'b, const N: usize> PartialEq<$lhs> for $rhs {
+        impl<'a, 'b, const N: usize> PartialEq<String<{N}>> for $rhs {
             #[inline]
-            fn eq(&self, other: &$lhs) -> bool {
+            fn eq(&self, other: &String<{N}>) -> bool {
                 str::eq(&self[..], &other[..])
             }
             #[inline]
-            fn ne(&self, other: &$lhs) -> bool {
+            fn ne(&self, other: &String<{N}>) -> bool {
                 str::ne(&self[..], &other[..])
             }
         }
     };
 }
 
-impl_eq! { String<{N}>, str }
-impl_eq! { String<{N}>, &'a str }
+impl_eq! { str }
+impl_eq! { &'a str }
 
 impl<const N: usize> Eq for String<{N}> {}
 
 macro_rules! impl_from_num {
-    ($num:ty, $size:literal, $N:ident) => {
-        impl<const $N: usize> From<$num> for String<{$N}>
+    ($num:ty, $size:literal) => {
+        impl<const N: usize> From<$num> for String<{N}>
         //where
         //    N: ArrayLength<u8> + IsGreaterOrEqual<$size, Output = True>,
         {
             fn from(s: $num) -> Self {
-                assert!($N >= $size);
+                assert!(N >= $size);
                 let mut new = String::new();
                 write!(&mut new, "{}", s).unwrap();
                 new
@@ -469,15 +469,15 @@ macro_rules! impl_from_num {
     };
 }
 
-impl_from_num!(i8, 4, N);
-impl_from_num!(i16, 6, N);
-impl_from_num!(i32, 11, N);
-impl_from_num!(i64, 20, N);
+impl_from_num!(i8, 4);
+impl_from_num!(i16, 6);
+impl_from_num!(i32, 11);
+impl_from_num!(i64, 20);
 
-impl_from_num!(u8, 3, N);
-impl_from_num!(u16, 5, N);
-impl_from_num!(u32, 10, N);
-impl_from_num!(u64, 20, N);
+impl_from_num!(u8, 3);
+impl_from_num!(u16, 5);
+impl_from_num!(u32, 10);
+impl_from_num!(u64, 20);
 
 #[cfg(test)]
 mod tests {

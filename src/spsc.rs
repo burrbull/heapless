@@ -287,8 +287,8 @@ where
 }
 
 macro_rules! impl_ {
-    ($uxx:ident, $uxx_sc:ident, $N:ident) => {
-        impl<T, const $N: usize> Queue<T, $uxx, MultiCore, {$N}> {
+    ($uxx:ident, $uxx_sc:ident) => {
+        impl<T, const N: usize> Queue<T, $uxx, MultiCore, {N}> {
             /// Creates an empty queue with a fixed capacity of `N`
             pub const fn $uxx() -> Self {
                 Self {
@@ -299,7 +299,7 @@ macro_rules! impl_ {
             }
         }
 
-        impl<T, const $N: usize> Queue<T, $uxx, SingleCore, {$N}> {
+        impl<T, const N: usize> Queue<T, $uxx, SingleCore, {N}> {
             /// Creates an empty queue with a fixed capacity of `N` (single core variant)
             pub const unsafe fn $uxx_sc() -> Self {
                 Self {
@@ -310,7 +310,7 @@ macro_rules! impl_ {
             }
         }
 
-        impl<T, C, const $N: usize> Queue<T, $uxx, C, {$N}>
+        impl<T, C, const N: usize> Queue<T, $uxx, C, {N}>
         where
             C: sealed::XCore,
         {
@@ -382,13 +382,13 @@ macro_rules! impl_ {
             }
         }
 
-        impl<T, C, const $N: usize> Clone for Queue<T, $uxx, C, {$N}>
+        impl<T, C, const N: usize> Clone for Queue<T, $uxx, C, {N}>
         where
             T: Clone,
             C: sealed::XCore,
         {
             fn clone(&self) -> Self {
-                let mut new: Queue<T, $uxx, C, {$N}> = Queue {
+                let mut new: Queue<T, $uxx, C, {N}> = Queue {
                     buffer: MaybeUninit::uninit(),
                     head: Atomic::new(0),
                     tail: Atomic::new(0),
@@ -421,9 +421,9 @@ impl<T, const N: usize> Queue<T, usize, SingleCore, {N}> {
     }
 }
 
-impl_!(u8, u8_sc, N);
-impl_!(u16, u16_sc, N);
-impl_!(usize, usize_sc, N);
+impl_!(u8, u8_sc);
+impl_!(u16, u16_sc);
+impl_!(usize, usize_sc);
 
 impl<T, U, C, U2, C2, const N: usize, const N2: usize> PartialEq<Queue<T, U2, C2, {N2}>> for Queue<T, U, C, {N}>
 where
@@ -484,8 +484,8 @@ where
 }
 
 macro_rules! iterator {
-    (struct $name:ident -> $elem:ty, $ptr:ty, $asptr:ident, $mkref:ident, $N:ident) => {
-        impl<'a, T, U, C, const $N: usize> Iterator for $name<'a, T, U, C, {$N}>
+    (struct $name:ident -> $elem:ty, $ptr:ty, $asptr:ident, $mkref:ident) => {
+        impl<'a, T, U, C, const N: usize> Iterator for $name<'a, T, U, C, {N}>
         where
             U: sealed::Uxx,
             C: sealed::XCore,
@@ -521,8 +521,8 @@ macro_rules! make_ref_mut {
     };
 }
 
-iterator!(struct Iter -> &'a T, *const T, as_ptr, make_ref, N);
-iterator!(struct IterMut -> &'a mut T, *mut T, as_mut_ptr, make_ref_mut, N);
+iterator!(struct Iter -> &'a T, *const T, as_ptr, make_ref);
+iterator!(struct IterMut -> &'a mut T, *mut T, as_mut_ptr, make_ref_mut);
 /*
 #[cfg(test)]
 mod tests {

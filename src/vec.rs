@@ -440,8 +440,8 @@ where
 }
 
 macro_rules! eq {
-    ($Lhs:ty, $Rhs:ty) => {
-        impl<'a, 'b, A, B, const N: usize> PartialEq<$Rhs> for $Lhs
+    ($Rhs:ty) => {
+        impl<'a, 'b, A, B, const N: usize> PartialEq<$Rhs> for Vec<A, {N}>
         where
             A: PartialEq<B>,
         {
@@ -453,8 +453,8 @@ macro_rules! eq {
 }
 
 macro_rules! eq1 {
-    ($Lhs:ty, $Rhs:ty) => {
-        impl<'a, 'b, A, B, const N1: usize, const N2: usize> PartialEq<$Rhs> for $Lhs
+    ($Rhs:ty) => {
+        impl<'a, 'b, A, B, const N1: usize, const N2: usize> PartialEq<$Rhs> for Vec<A, {N1}>
         where
             A: PartialEq<B>,
         {
@@ -465,12 +465,12 @@ macro_rules! eq1 {
     };
 }
 
-eq!(Vec<A, {N}>, [B]);
-eq!(Vec<A, {N}>, &'a [B]);
-eq!(Vec<A, {N}>, &'a mut [B]);
+eq!([B]);
+eq!(&'a [B]);
+eq!(&'a mut [B]);
 
-eq1!(Vec<A, {N1}>, [B; {N2}]);
-eq1!(Vec<A, {N1}>, &'a [B; {N2}]);
+eq1!([B; {N2}]);
+eq1!(&'a [B; {N2}]);
 
 impl<T, const N: usize> Eq for Vec<T, {N}>
 where
